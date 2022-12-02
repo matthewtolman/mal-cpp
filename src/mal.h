@@ -6,6 +6,12 @@
 #include <variant>
 #include <map>
 
+#if THREADING
+#include <thread>
+#include <shared_mutex>
+#include <memory>
+#endif
+
 namespace mal {
     class Reader {
         size_t position = 0;
@@ -30,7 +36,8 @@ namespace mal {
     struct MalBoolean;
     struct MalFn;
     struct MalNs;
-    typedef std::variant<MalNil, MalBoolean, MalInteger, MalKeyword, MalSymbol, MalString, MalList, MalVector, MalMap, MalFn, MalNativeFn> MalVariant;
+    struct MalAtom;
+    typedef std::variant<MalNil, MalBoolean, MalInteger, MalKeyword, MalSymbol, MalString, MalList, MalVector, MalMap, MalAtom, MalFn, MalNativeFn> MalVariant;
 
     struct MalNil {};
     struct MalList { std::vector<MalData> val; };
@@ -67,10 +74,32 @@ namespace mal {
     struct MalKeyword { std::string val; };
     struct MalVector { std::vector<MalData> val; };
     struct MalMap { std::map<MalData, MalData> val; };
+
+    struct Atom{
+#if THREADING
+        std::shared_mutex mux{};
+#endif
+        std::unique_ptr<MalData> md = std::make_unique<MalData>();
+
+        auto set(MalData data) -> Atom&;
+        auto get() -> MalData;
+        auto swap(const std::function<MalData(const MalData&)>&) -> MalData;
+    };
+
+    class MalAtom {
+        std::shared_ptr<Atom> ref;
+    public:
+        MalAtom(MalData md);
+
+        auto get() const -> MalData;
+        auto set(MalData md) -> MalAtom&;
+        auto swap(const std::function<MalData(const MalData&)>&) -> MalData;
+    };
     struct MalFn {
         std::vector<MalSymbol> bindings;
         std::vector<MalData> exprs;
         std::shared_ptr<MalEnv> closureScope;
+        auto operator()(std::shared_ptr<MalEnv> env, const mal::MalList& args) const -> MalData;
     };
     struct MalNativeFn {
         size_t num_args;
@@ -91,6 +120,7 @@ namespace mal {
         MalData(MalList v) : val(std::move(v)) {};
         MalData(MalVector v) : val(std::move(v)) {};
         MalData(MalMap v) : val(std::move(v)) {};
+        MalData(MalAtom v) : val(std::move(v)) {};
         MalData(MalFn v) : val(std::move(v)) {};
         MalData(MalNativeFn v) : val(std::move(v)) {};
         MalData(const MalData& o) : val(o.val) {};
@@ -125,6 +155,7 @@ namespace mal {
         [[nodiscard]] auto is_native_fn() const { return std::holds_alternative<MalNativeFn>(val); }
         [[nodiscard]] auto is_user_fn() const { return std::holds_alternative<MalFn>(val); }
         [[nodiscard]] auto is_bool() const { return std::holds_alternative<MalBoolean>(val); }
+        [[nodiscard]] auto is_atom() const { return std::holds_alternative<MalAtom>(val); }
         [[nodiscard]] auto is_falsey() const { return is_nil() || (*this) == MalBoolean{false}; }
         [[nodiscard]] auto is_truthy() const { return !is_falsey(); }
 

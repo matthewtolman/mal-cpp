@@ -49,6 +49,11 @@ auto mal::PRINT(const mal::MalData& data, bool print_readably) -> std::string {
             return ss.str();
         },
         [](const mal::MalBoolean& b) -> std::string { return b.val ? "true" : "false"; },
+        [print_readably](const mal::MalAtom& a) -> std::string {
+            std::stringstream ss;
+            ss << "(atom " << PRINT(a.get(), print_readably) << ")";
+            return ss.str();
+        },
         [](const auto& v) {
             std::stringstream ss;
             ss << v.val;

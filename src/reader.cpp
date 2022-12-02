@@ -63,17 +63,30 @@ static auto read_form(mal::Reader &reader) -> std::optional<mal::MalData> {
     auto val = *valOpt;
     if (val == "(") {
         return read_list(reader);
-    } else if (val == "{") {
+    }
+    else if (val == "{") {
         return read_map(reader);
-    } else if (val == "[") {
+    }
+    else if (val == "[") {
         return read_vector(reader);
-    } else if (val.starts_with('"')) {
+    }
+    else if (val == "@") {
+        auto next = reader.next();
+        if (!next) {
+            throw std::runtime_error("Expected token after @ symbol");
+        }
+        return mal::MalList{{mal::MalSymbol{"deref"}, *read_form(reader)}};
+    }
+    else if (val.starts_with('"')) {
         return read_string(reader);
-    } else if (val.starts_with(':')) {
+    }
+    else if (val.starts_with(':')) {
         return read_keyword(reader);
-    } else if (val.starts_with(';')) {
+    }
+    else if (val.starts_with(';')) {
         return std::nullopt;
-    } else {
+    }
+    else {
         return read_atom(reader);
     }
 }

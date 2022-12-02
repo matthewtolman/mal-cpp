@@ -26,6 +26,11 @@ static auto compare(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) 
 static auto eval(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto print_env(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto get_env(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto make_atom(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto is_atom(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto deref(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto reset(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto swap(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 
 auto mal::core_ns() -> mal::MalNs {
     auto ns = mal::MalNs{
@@ -58,6 +63,11 @@ auto mal::core_ns() -> mal::MalNs {
                     {mal::MalSymbol{"eval"}, mal::MalNativeFn{1, false,eval}},
                     {mal::MalSymbol{"*print-env*"}, mal::MalNativeFn{0, false,print_env}},
                     {mal::MalSymbol{"*env*"}, mal::MalNativeFn{0, false, get_env}},
+                    {mal::MalSymbol{"atom"}, mal::MalNativeFn{1, false, make_atom}},
+                    {mal::MalSymbol{"atom?"}, mal::MalNativeFn{1, false, is_atom}},
+                    {mal::MalSymbol{"deref"}, mal::MalNativeFn{1, false, deref}},
+                    {mal::MalSymbol{"reset!"}, mal::MalNativeFn{2, false, reset}},
+                    {mal::MalSymbol{"swap!"}, mal::MalNativeFn{2, true, swap}},
             }
     );
     mal::EVAL(env, mal::READ("(def! load-file (fn* (*f*) (eval (read-string (str \"(do \" (slurp *f*) \"\\nnil)\")))))"));
@@ -65,6 +75,56 @@ auto mal::core_ns() -> mal::MalNs {
         "core",
         env->definitions()
     };
+}
+
+static auto reset(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    if (!list.val[0].is_atom()) {
+        throw std::runtime_error("Argument 1 to reset! must be an atom!");
+    }
+    auto cpy = std::get<mal::MalAtom>(list.val[0].val);
+    cpy.set(list.val[1]);
+    return list.val[1];
+}
+
+static auto swap(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    if (!list.val[0].is_atom()) {
+        throw std::runtime_error("Argument 1 to swap! must be an atom!");
+    }
+    else if (!list.val[1].is_fn()) {
+        throw std::runtime_error("Argument 2 to swap! must be a function!");
+    }
+    auto cpy = std::get<mal::MalAtom>(list.val[0].val);
+    auto& fnArg = list.val[1];
+    auto argList = mal::MalList{};
+    argList.val.reserve(list.val.size() - 1);
+    argList.val.emplace_back();
+    std::copy(list.val.begin() + 2, list.val.end(), std::back_inserter(argList.val));
+    return cpy.swap([&env, &fnArg, &argList](const mal::MalData& value) {
+        argList.val[0] = value;
+        if (fnArg.is_native_fn()) {
+            return std::get<mal::MalNativeFn>(fnArg.val)(env, argList);
+        }
+        else {
+            return std::get<mal::MalFn>(fnArg.val)(env, argList);
+        }
+    });
+}
+
+auto deref(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    if (!list.val[0].is_atom()) {
+        return list.val[0];
+    }
+    else {
+        return std::get<mal::MalAtom>(list.val[0].val).get();
+    }
+}
+
+auto is_atom(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    return mal::MalBoolean{list.val[0].is_atom()};
+}
+
+auto make_atom(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    return mal::MalAtom(list.val[0]);
 }
 
 auto get_env(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
@@ -369,4 +429,16 @@ auto divide(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::
         }
     }
     return res;
+}
+
+auto mal::MalAtom::swap(const std::function<MalData(const MalData&)>& fn) -> MalData {
+    return ref->swap(fn);
+}
+
+auto mal::Atom::swap(const std::function<MalData(const MalData& d)>& fn) -> MalData {
+#if THREADING
+    std::unique_lock lock(mux);
+#endif
+    *md = fn(*md);
+    return *md;
 }

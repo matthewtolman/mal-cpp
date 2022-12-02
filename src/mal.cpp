@@ -59,6 +59,11 @@ auto mal::MalData::operator<=>(const mal::MalData& right) const -> std::strong_o
         [](const mal::MalInteger& l, const mal::MalInteger& r) -> std::strong_ordering {
             return l.val <=> r.val;
         },
+        [](const mal::MalAtom& l, const mal::MalAtom& r) -> std::strong_ordering {
+            auto left = l.get();
+            auto right = r.get();
+            return left <=> right;
+        },
         [](const mal::MalKeyword& l, const mal::MalKeyword& r) -> std::strong_ordering {
             return compare_str(l.val, r.val);
         },
@@ -158,6 +163,9 @@ auto mal::hash(const mal::MalData &obj) -> size_t {
                 return std::accumulate(hashes.begin(), hashes.end(), index,
                                        [](const auto &a, const auto &c) { return hashes::hash_combine(a, c); });
             },
+            [&index](const mal::MalAtom& o) {
+                return hashes::hash_combine(index, o.get());
+            },
             [&index](const mal::MalVector &o) {
                 std::vector<size_t> hashes{};
                 hashes.reserve(o.val.size());
@@ -197,6 +205,50 @@ auto mal::MalNativeFn::operator()(std::shared_ptr<MalEnv> env, const mal::MalLis
     return fn(std::move(env), args);
 }
 
+auto mal::MalFn::operator()(std::shared_ptr<MalEnv> env, const mal::MalList& args) const -> MalData {
+    if (args.val.size() != bindings.size()) {
+        throw std::runtime_error("Expected '" + std::to_string(bindings.size()) + "' args to func call, received '" + std::to_string(args.val.size()) + "' instead!");
+    }
+    env = std::make_shared<MalEnv>(env);
+    env->mergeWith(closureScope);
+    for (size_t i = 0; i < bindings.size(); ++i) {
+        (*env)[bindings[i]] = EVAL(env, args.val[i]);
+    }
+    for (size_t i = 1; i < exprs.size() - 1; ++i) {
+        EVAL(env, exprs[i]);
+    }
+    return EVAL(env, exprs[exprs.size() - 1]);
+}
+
 auto mal::MalSymbol::operator<=>(const mal::MalSymbol &right) const -> std::strong_ordering {
     return compare_str(val, right.val);
+}
+
+
+mal::MalAtom::MalAtom(mal::MalData md) : ref(std::make_shared<mal::Atom>()) {
+    ref->set(md);
+}
+
+auto mal::MalAtom::get() const -> MalData {
+    return ref->get();
+}
+
+auto mal::MalAtom::set(mal::MalData md) -> mal::MalAtom& {
+    ref->set(md);
+    return *this;
+}
+
+auto mal::Atom::get() -> MalData {
+#if THREADING
+    std::shared_lock lock(mux);
+#endif
+    return *md;
+}
+
+auto mal::Atom::set(mal::MalData data) -> Atom& {
+#if THREADING
+    std::unique_lock lock(mux);
+#endif
+    *md = std::move(data);
+    return *this;
 }

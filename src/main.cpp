@@ -34,6 +34,16 @@ auto main(int argc, char** argv) -> int {
     bool reducedView = argc > 1 && strcmp(argv[1], "--simple") == 0;
     auto env = std::make_shared<mal::MalEnv>();
 
+
+    if (argc == 2 && !reducedView) {
+        mal::rep(env, std::string("(load-file \"") + argv[1] + "\")");
+        return 0;
+    }
+    else if (argc == 3) {
+        mal::rep(env, std::string("(load-file \"") + argv[2] + "\")");
+        return 0;
+    }
+
     if (reducedView) {
         std::string line;
         while (simplePrompt("user> ", line)) {

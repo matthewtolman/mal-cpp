@@ -155,4 +155,32 @@ TEST_SUITE("[mal_env][impl]") {
         auto env = std::make_shared<mal::MalEnv>();
         REQUIRE_EQ(mal::rep(env, R"((do (load-file "test.lsp") (inc4 3)))"), R"(7)");
     }
+
+    TEST_CASE("atom") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((atom 5))"), R"((atom 5))");
+    }
+
+    TEST_CASE("atom?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((atom? (atom 5)))"), R"(true)");
+    }
+
+    TEST_CASE("deref") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((deref (atom 5)))"), R"(5)");
+        REQUIRE_EQ(mal::rep(env, R"(@(atom 5))"), R"(5)");
+    }
+
+    TEST_CASE("reset!") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((reset! (atom 5) 10))"), R"(10)");
+    }
+
+    TEST_CASE("swap!") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((swap! (atom 5) (fn* [x] (+ x 1))))"), R"(6)");
+        REQUIRE_EQ(mal::rep(env, R"((swap! (atom 5) str))"), R"("5")");
+        REQUIRE_EQ(mal::rep(env, R"((swap! (atom 5) str "a"))"), R"("5a")");
+    }
 }
