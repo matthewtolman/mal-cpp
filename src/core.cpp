@@ -23,6 +23,7 @@ static auto less_eq(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) 
 static auto greater(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto greater_eq(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto compare(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto eval(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 
 auto mal::core_ns() -> mal::MalNs {
     return mal::MalNs{
@@ -48,8 +49,13 @@ auto mal::core_ns() -> mal::MalNs {
                 {mal::MalSymbol{">"}, mal::MalNativeFn{1, true, greater}},
                 {mal::MalSymbol{">="}, mal::MalNativeFn{1, true, greater_eq}},
                 {mal::MalSymbol{"<=>"}, mal::MalNativeFn{2, false, compare}},
+                {mal::MalSymbol{"eval"}, mal::MalNativeFn{1, false,eval}},
         }
     };
+}
+
+auto eval(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    return mal::EVAL(std::move(env), list.val[0]);
 }
 
 auto equals(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {

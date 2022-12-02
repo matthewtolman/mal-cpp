@@ -33,9 +33,6 @@ auto simplePrompt(const char* prompt, std::string& line) -> decltype(auto) {
 auto main(int argc, char** argv) -> int {
     bool reducedView = argc > 1 && strcmp(argv[1], "--simple") == 0;
     auto env = std::make_shared<mal::MalEnv>();
-    (*env)[mal::MalSymbol{"eval"}] = mal::MalNativeFn{1, false, [](std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
-        return mal::EVAL(std::move(env), list.val[0]);
-    }};
 
     if (reducedView) {
         std::string line;

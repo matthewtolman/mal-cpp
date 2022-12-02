@@ -145,4 +145,9 @@ TEST_SUITE("[mal_env][impl]") {
         REQUIRE_EQ(mal::rep(env, R"((<=> 5 5))"), R"(0)");
         REQUIRE_EQ(mal::rep(env, R"((<=> 5 6))"), R"(-1)");
     }
+
+    TEST_CASE("eval") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((let* [mal-prog (list + 1 2)] (eval mal-prog)))"), R"(3)");
+    }
 }
