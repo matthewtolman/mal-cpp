@@ -125,10 +125,11 @@ namespace mal {
         [[nodiscard]] auto is_native_fn() const { return std::holds_alternative<MalNativeFn>(val); }
         [[nodiscard]] auto is_user_fn() const { return std::holds_alternative<MalFn>(val); }
         [[nodiscard]] auto is_bool() const { return std::holds_alternative<MalBoolean>(val); }
-        [[nodiscard]] auto is_falsey() const { return is_nil() || (*this) == MalData{MalBoolean{false}}; }
+        [[nodiscard]] auto is_falsey() const { return is_nil() || (*this) == MalBoolean{false}; }
         [[nodiscard]] auto is_truthy() const { return !is_falsey(); }
 
         [[nodiscard]] auto is_seq() const { return is_list() || is_vec(); }
+        [[nodiscard]] auto is_coll() const { return is_map() || is_seq(); }
         [[nodiscard]] auto is_number() const { return is_int(); }
         [[nodiscard]] auto is_string_like() const { return is_string() || is_keyword() || is_symbol(); }
         [[nodiscard]] auto is_fn() const { return is_native_fn() || is_user_fn(); }
@@ -178,7 +179,7 @@ namespace mal {
         }
     };
 
-    auto READ(std::string str) -> mal::MalData;
+    auto READ(const std::string& str) -> mal::MalData;
     auto EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData;
     auto PRINT(const mal::MalData& data, bool print_readably = true) -> std::string;
     auto rep(std::shared_ptr<MalEnv> env, std::string str, bool print_readably = true) -> std::string;

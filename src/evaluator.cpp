@@ -12,7 +12,7 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
             if (list.val.empty()) {
                 return data;
             }
-            else if (list.val[0] == MalData{MalSymbol{"def!"}}) {
+            else if (list.val[0] == MalSymbol{"def!"}) {
                 if (list.val.size() != 3) {
                     throw std::runtime_error(
                             "Expected 2 arguments to 'def!', received " + std::to_string(list.val.size() - 1));
@@ -22,7 +22,7 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                     return (*env)[std::get<MalSymbol>(list.val[1].val)] = EVAL(env, list.val[2]);
                 }
             }
-            else if (list.val[0] == MalData{MalSymbol{"let*"}}) {
+            else if (list.val[0] == MalSymbol{"let*"}) {
                 if (list.val.size() != 3) {
                     throw std::runtime_error(
                             "Expected 2 arguments to 'def!', received " + std::to_string(list.val.size() - 1));
@@ -42,7 +42,7 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                     std::swap(cpy, data);
                 }
             }
-            else if (list.val[0] == MalData{MalSymbol{"do"}}) {
+            else if (list.val[0] == MalSymbol{"do"}) {
                 if (list.val.size() < 2) {
                     throw std::runtime_error(
                             "Expected at least 1 arguments to 'do', received " + std::to_string(list.val.size() - 1));
@@ -54,7 +54,7 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                 auto cpy = list.val[list.val.size() - 1];
                 std::swap(data, cpy);
             }
-            else if (list.val[0] == MalData{MalSymbol{"if"}}) {
+            else if (list.val[0] == MalSymbol{"if"}) {
                 if (list.val.size() < 3 || list.val.size() > 4) {
                     throw std::runtime_error(
                             "Expected at 3-4 arguments to 'if', received " + std::to_string(list.val.size() - 1));
@@ -68,7 +68,7 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                     std::swap(cpy, data);
                 }
             }
-            else if (list.val[0] == MalData{MalSymbol{"fn*"}}) {
+            else if (list.val[0] == MalSymbol{"fn*"}) {
                 if (list.val.size() < 3) {
                     throw std::runtime_error(
                             "Expected at least 3 arguments to 'fn*', received " + std::to_string(list.val.size() - 1));
@@ -92,13 +92,11 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                 for (size_t i = 2; i < list.val.size(); ++i) {
                     exprs.emplace_back(list.val[i]);
                 }
-                return MalData{
-                        MalFn{
+                return MalFn{
                                 args,
                                 exprs,
                                 env
-                        }
-                };
+                        };
             }
             else {
                 auto evaluated_list = eval_ast(env, data);
@@ -150,7 +148,7 @@ static auto eval_ast(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal:
         std::transform(list.val.begin(), list.val.end(), std::back_inserter(res), [&env](const auto& data) {
             return EVAL(env, data);
         });
-        return MalData{MalList{res}};
+        return MalList{res};
     }
     else if (ast.is_vec()) {
         std::vector<MalData> res{};
@@ -159,7 +157,7 @@ static auto eval_ast(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal:
         std::transform(vector.val.begin(), vector.val.end(), std::back_inserter(res), [&env](const auto& data) {
             return EVAL(env, data);
         });
-        return MalData{MalVector{res}};
+        return MalVector{res};
     }
     else if (ast.is_map()) {
         std::map<MalData, MalData> res{};
@@ -167,7 +165,7 @@ static auto eval_ast(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal:
         std::for_each(map.val.begin(), map.val.end(), [&env, &res](const auto& entry) {
             res[EVAL(env, entry.first)] = EVAL(env, entry.second);;
         });
-        return MalData{MalMap{res}};
+        return MalMap{res};
     }
     else {
         return ast;

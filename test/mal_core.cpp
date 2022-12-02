@@ -59,4 +59,90 @@ TEST_SUITE("[mal_env][impl]") {
         auto env = std::make_shared<mal::MalEnv>();
         REQUIRE_EQ(mal::rep(env, R"((println true 5 3 "hello"))"), "nil");
     }
+
+    TEST_CASE("read-str") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((read-str "5"))"), "5");
+        REQUIRE_EQ(mal::rep(env, R"((read-str "\"hello\""))"), R"("hello")");
+    }
+
+    TEST_CASE("slurp") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((slurp "test.txt"))"), R"("Hello World!\nHow are you?")");
+    }
+
+    TEST_CASE("list") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((list 1 2 3 "hello"))"), R"((1 2 3 "hello"))");
+    }
+
+    TEST_CASE("list?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((list? 1))"), R"(false)");
+        REQUIRE_EQ(mal::rep(env, R"((list? (list 1 2 3)))"), R"(true)");
+    }
+
+    TEST_CASE("empty?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((empty? (list)))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((empty? (list 1 2 3)))"), R"(false)");
+        REQUIRE_EQ(mal::rep(env, R"((empty? []))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((empty? [1 2 3]))"), R"(false)");
+        REQUIRE_EQ(mal::rep(env, R"((empty? {}))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((empty? {1 2 3 4}))"), R"(false)");
+    }
+
+    TEST_CASE("count") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((count (list)))"), R"(0)");
+        REQUIRE_EQ(mal::rep(env, R"((count (list 1 2 3)))"), R"(3)");
+        REQUIRE_EQ(mal::rep(env, R"((count []))"), R"(0)");
+        REQUIRE_EQ(mal::rep(env, R"((count [1 2 3]))"), R"(3)");
+        REQUIRE_EQ(mal::rep(env, R"((count {}))"), R"(0)");
+        REQUIRE_EQ(mal::rep(env, R"((count {1 2 3 4}))"), R"(2)");
+    }
+
+    TEST_CASE("=") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((= 5 5))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((= 5 5 5 5 5 5))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((= 5 5 15 5 5 5))"), R"(false)");
+    }
+
+    TEST_CASE("<") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((< 5 6))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((< 5 6 7 8 9 10))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((< 5 6 15 8 9 10))"), R"(false)");
+        REQUIRE_EQ(mal::rep(env, R"((< 5 5))"), R"(false)");
+    }
+
+    TEST_CASE("<=") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((<= 5 6))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((<= 5 6 7 8 9 9))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((<= 5 6 15 8 9 10))"), R"(false)");
+    }
+
+    TEST_CASE(">") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((> 6 5))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((> 6 5 4 3 2 1))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((> 6 5 15 8 9 10))"), R"(false)");
+        REQUIRE_EQ(mal::rep(env, R"((> 5 5))"), R"(false)");
+    }
+
+    TEST_CASE(">=") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((>= 8 6))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((>= 5 5 4 3 2 1))"), R"(true)");
+        REQUIRE_EQ(mal::rep(env, R"((>= 5 6 15))"), R"(false)");
+    }
+
+    TEST_CASE("<=>") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((<=> 8 6))"), R"(1)");
+        REQUIRE_EQ(mal::rep(env, R"((<=> 5 5))"), R"(0)");
+        REQUIRE_EQ(mal::rep(env, R"((<=> 5 6))"), R"(-1)");
+    }
 }

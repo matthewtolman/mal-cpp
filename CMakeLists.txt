@@ -13,9 +13,15 @@ target_include_directories(mal-lib PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/pcre2-10.4
 add_executable(mal src/main.cpp)
 target_link_libraries(mal PUBLIC mal-lib)
 
-add_executable(mal-tests test/main.cpp test/basic_repl.cpp test/mal_data.cpp test/eval.cpp test/mal_core.cpp)
+add_executable(mal-tests test/main.cpp test/basic_repl.cpp test/mal_data.cpp test/eval.cpp test/mal_core.cpp mal_files_out)
 target_link_libraries(mal-tests PUBLIC mal-lib)
 target_include_directories(mal-tests PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+add_custom_target(
+        mal-files
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/test/test.txt ${CMAKE_CURRENT_BINARY_DIR}/test.txt
+        BYPRODUCTS mal_files_out
+)
 
 ENABLE_TESTING()
 ADD_TEST(mal_tests mal-tests)

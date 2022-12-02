@@ -62,15 +62,15 @@ static auto read_form(mal::Reader &reader) -> std::optional<mal::MalData> {
     }
     auto val = *valOpt;
     if (val == "(") {
-        return mal::MalData{read_list(reader)};
+        return read_list(reader);
     } else if (val == "{") {
-        return mal::MalData{read_map(reader)};
+        return read_map(reader);
     } else if (val == "[") {
-        return mal::MalData{read_vector(reader)};
+        return read_vector(reader);
     } else if (val.starts_with('"')) {
-        return mal::MalData{read_string(reader)};
+        return read_string(reader);
     } else if (val.starts_with(':')) {
-        return mal::MalData{read_keyword(reader)};
+        return read_keyword(reader);
     } else if (val.starts_with(';')) {
         return std::nullopt;
     } else {
@@ -200,26 +200,26 @@ static auto read_keyword(mal::Reader &reader) -> mal::MalKeyword {
 static auto read_atom(mal::Reader &reader) -> mal::MalData {
     auto val = *reader.peek();
     if (val == "nil") {
-        return mal::MalData{mal::MalNil{}};
+        return mal::MalNil{};
     }
     else if (std::isdigit(val[0]) || (val.size() > 1 && val[0] == '-' && isdigit(val[1]))) {
-        return mal::MalData{mal::MalInteger{std::strtoll(val.c_str(), nullptr, 10)}};
+        return mal::MalInteger{std::strtoll(val.c_str(), nullptr, 10)};
     }
     else if (val == "true") {
-        return mal::MalData{mal::MalBoolean{true}};
+        return mal::MalBoolean{true};
     }
     else if (val == "false") {
-        return mal::MalData{mal::MalBoolean{false}};
+        return mal::MalBoolean{false};
     }
     else {
-        return mal::MalData{mal::MalSymbol{val}};
+        return mal::MalSymbol{val};
     }
 }
 
-auto mal::READ(std::string str) -> mal::MalData {
+auto mal::READ(const std::string& str) -> mal::MalData {
     auto res = read_str(str);
     if (!res) {
-        return mal::MalData{mal::MalNil{}};
+        return mal::MalNil{};
     }
     return *res;
 }

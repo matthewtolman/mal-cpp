@@ -138,7 +138,7 @@ auto mal::MalData::operator<=>(const mal::MalData& right) const -> std::strong_o
                     return order;
                 }
             }
-            return MalData{MalVector{l.exprs}} <=> MalData{MalVector{r.exprs}};
+            return MalData{MalVector{l.exprs}} <=> MalVector{r.exprs};
         },
         [&](const auto&, const auto&) -> std::strong_ordering {
             return val.index() <=> right.val.index();

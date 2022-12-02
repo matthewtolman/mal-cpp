@@ -33,16 +33,16 @@ auto mal::PRINT(const mal::MalData& data, bool print_readably) -> std::string {
             std::stringstream ss;
             ss << "(fn* [";
             if (!n.bindings.empty()) {
-                ss << PRINT(MalData{n.bindings[0]}, print_readably);
+                ss << PRINT(n.bindings[0], print_readably);
                 for (auto it = n.bindings.begin() + 1; it != n.bindings.end(); ++it) {
-                    ss << " " << PRINT(MalData{*it}, print_readably);
+                    ss << " " << PRINT(*it, print_readably);
                 }
             }
             ss << "] ";
             if (!n.exprs.empty()) {
-                ss << PRINT(MalData{n.exprs[0]}, print_readably);
+                ss << PRINT(n.exprs[0], print_readably);
                 for (auto it = n.exprs.begin() + 1; it != n.exprs.end(); ++it) {
-                    ss << " " << PRINT(MalData{*it}, print_readably);
+                    ss << " " << PRINT(*it, print_readably);
                 }
             }
             ss << ")";
