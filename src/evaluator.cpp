@@ -19,7 +19,8 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                 } else if (!list.val[1].is_symbol()) {
                     throw std::runtime_error("Expected first argument to 'def!' to be a symbol!");
                 } else {
-                    return (*env)[std::get<MalSymbol>(list.val[1].val)] = EVAL(env, list.val[2]);
+                    auto& dEnv = env->root();
+                    return dEnv[std::get<MalSymbol>(list.val[1].val)] = EVAL(env, list.val[2]);
                 }
             }
             else if (list.val[0] == MalSymbol{"let*"}) {
@@ -116,11 +117,11 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                     if (eval_list.val.size() != fn.bindings.size()) {
                         throw std::runtime_error("Expected '" + std::to_string(fn.bindings.size()) + "' args to func call, received '" + std::to_string(eval_list.val.size()) + "' instead!");
                     }
-                    auto fnEnv = std::make_shared<MalEnv>(fn.closureScope);
+                    env = std::make_shared<MalEnv>(env);
+                    env->mergeWith(fn.closureScope);
                     for (size_t i = 0; i < fn.bindings.size(); ++i) {
-                        (*fnEnv)[fn.bindings[i]] = EVAL(env, eval_list.val[i]);
+                        (*env)[fn.bindings[i]] = EVAL(env, eval_list.val[i]);
                     }
-                    env = std::move(fnEnv);
                     for (size_t i = 1; i < fn.exprs.size() - 1; ++i) {
                         EVAL(env, fn.exprs[i]);
                     }

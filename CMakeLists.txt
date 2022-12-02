@@ -20,6 +20,7 @@ target_include_directories(mal-tests PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_custom_target(
         mal-files
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/test/test.txt ${CMAKE_CURRENT_BINARY_DIR}/test.txt
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/test/test.lsp ${CMAKE_CURRENT_BINARY_DIR}/test.lsp
         BYPRODUCTS mal_files_out
 )
 

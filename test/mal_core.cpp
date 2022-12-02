@@ -60,10 +60,10 @@ TEST_SUITE("[mal_env][impl]") {
         REQUIRE_EQ(mal::rep(env, R"((println true 5 3 "hello"))"), "nil");
     }
 
-    TEST_CASE("read-str") {
+    TEST_CASE("read-string") {
         auto env = std::make_shared<mal::MalEnv>();
-        REQUIRE_EQ(mal::rep(env, R"((read-str "5"))"), "5");
-        REQUIRE_EQ(mal::rep(env, R"((read-str "\"hello\""))"), R"("hello")");
+        REQUIRE_EQ(mal::rep(env, R"((read-string "5"))"), "5");
+        REQUIRE_EQ(mal::rep(env, R"((read-string "\"hello\""))"), R"("hello")");
     }
 
     TEST_CASE("slurp") {
@@ -149,5 +149,10 @@ TEST_SUITE("[mal_env][impl]") {
     TEST_CASE("eval") {
         auto env = std::make_shared<mal::MalEnv>();
         REQUIRE_EQ(mal::rep(env, R"((let* [mal-prog (list + 1 2)] (eval mal-prog)))"), R"(3)");
+    }
+
+    TEST_CASE("load-file") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, R"((do (load-file "test.lsp") (inc4 3)))"), R"(7)");
     }
 }

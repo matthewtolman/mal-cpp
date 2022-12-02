@@ -150,6 +150,36 @@ namespace mal {
         explicit MalEnv(std::shared_ptr<MalEnv> outer): outer(outer) {}
         MalEnv(std::shared_ptr<MalEnv> outer, std::map<MalSymbol, MalData> bindings): outer(outer), defined(bindings) {}
 
+        std::map<MalSymbol, MalData> definitions() const {
+            auto map = outer ? outer->definitions() : (decltype(defined)){};
+            for (const auto& [key, val] : defined) {
+                map[key] = val;
+            }
+            return map;
+        }
+
+        MalData defs() const {
+            MalMap res = outer ? std::get<MalMap>(outer->defs().val) : MalMap{};
+            for (const auto&[key, val] : defined) {
+                res.val[key] = val;
+            }
+            return res;
+        }
+
+        MalEnv& root() {
+            auto* e = this;
+            while (e->outer != nullptr) {
+                e = &(*outer);
+            }
+            return *e;
+        }
+
+        void mergeWith(const std::shared_ptr<MalEnv>& other) {
+            for (const auto& [key, val] : other->definitions()) {
+                defined[key] = val;
+            }
+        }
+
         class MalEnvEntry {
             MalEnv& env;
             MalSymbol key;

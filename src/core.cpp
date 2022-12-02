@@ -24,34 +24,55 @@ static auto greater(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) 
 static auto greater_eq(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto compare(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto eval(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto print_env(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto get_env(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 
 auto mal::core_ns() -> mal::MalNs {
+    auto ns = mal::MalNs{
+        "core",
+
+    };
+    auto env = std::make_shared<mal::MalEnv>(
+            nullptr,
+            std::map<MalSymbol, MalData>{
+                    {mal::MalSymbol{"+"}, mal::MalNativeFn{0, true, add}},
+                    {mal::MalSymbol{"-"}, mal::MalNativeFn{0, true, sub}},
+                    {mal::MalSymbol{"*"}, mal::MalNativeFn{0, true, mul}},
+                    {mal::MalSymbol{"/"}, mal::MalNativeFn{0, true, divide}},
+                    {mal::MalSymbol{"prn"}, mal::MalNativeFn{0, true, prn}},
+                    {mal::MalSymbol{"pr-str"}, mal::MalNativeFn{0, true, pr_str}},
+                    {mal::MalSymbol{"str"}, mal::MalNativeFn{0, true, str}},
+                    {mal::MalSymbol{"println"}, mal::MalNativeFn{0, true, println}},
+                    {mal::MalSymbol{"read-string"},mal::MalNativeFn{1, false, read_str}},
+                    {mal::MalSymbol{"slurp"}, mal::MalNativeFn{1, false, slurp}},
+                    {mal::MalSymbol{"list"}, mal::MalNativeFn{0, true, list}},
+                    {mal::MalSymbol{"list?"}, mal::MalNativeFn{1, false, is_list}},
+                    {mal::MalSymbol{"empty?"}, mal::MalNativeFn{1, false, is_empty}},
+                    {mal::MalSymbol{"count"}, mal::MalNativeFn{1, false, count}},
+                    {mal::MalSymbol{"="}, mal::MalNativeFn{1, true, equals}},
+                    {mal::MalSymbol{"<"}, mal::MalNativeFn{1, true, less}},
+                    {mal::MalSymbol{"<="}, mal::MalNativeFn{1, true, less_eq}},
+                    {mal::MalSymbol{">"}, mal::MalNativeFn{1, true, greater}},
+                    {mal::MalSymbol{">="}, mal::MalNativeFn{1, true, greater_eq}},
+                    {mal::MalSymbol{"<=>"}, mal::MalNativeFn{2, false, compare}},
+                    {mal::MalSymbol{"eval"}, mal::MalNativeFn{1, false,eval}},
+                    {mal::MalSymbol{"*print-env*"}, mal::MalNativeFn{0, false,print_env}},
+                    {mal::MalSymbol{"*env*"}, mal::MalNativeFn{0, false, get_env}},
+            }
+    );
+    mal::EVAL(env, mal::READ("(def! load-file (fn* (*f*) (eval (read-string (str \"(do \" (slurp *f*) \"\\nnil)\")))))"));
     return mal::MalNs{
         "core",
-        {
-                {mal::MalSymbol{"+"}, mal::MalNativeFn{0, true, add}},
-                {mal::MalSymbol{"-"}, mal::MalNativeFn{0, true, sub}},
-                {mal::MalSymbol{"*"}, mal::MalNativeFn{0, true, mul}},
-                {mal::MalSymbol{"/"}, mal::MalNativeFn{0, true, divide}},
-                {mal::MalSymbol{"prn"}, mal::MalNativeFn{0, true, prn}},
-                {mal::MalSymbol{"pr-str"}, mal::MalNativeFn{0, true, pr_str}},
-                {mal::MalSymbol{"str"}, mal::MalNativeFn{0, true, str}},
-                {mal::MalSymbol{"println"}, mal::MalNativeFn{0, true, println}},
-                {mal::MalSymbol{"read-str"},mal::MalNativeFn{1, false, read_str}},
-                {mal::MalSymbol{"slurp"}, mal::MalNativeFn{1, false, slurp}},
-                {mal::MalSymbol{"list"}, mal::MalNativeFn{0, true, list}},
-                {mal::MalSymbol{"list?"}, mal::MalNativeFn{1, false, is_list}},
-                {mal::MalSymbol{"empty?"}, mal::MalNativeFn{1, false, is_empty}},
-                {mal::MalSymbol{"count"}, mal::MalNativeFn{1, false, count}},
-                {mal::MalSymbol{"="}, mal::MalNativeFn{1, true, equals}},
-                {mal::MalSymbol{"<"}, mal::MalNativeFn{1, true, less}},
-                {mal::MalSymbol{"<="}, mal::MalNativeFn{1, true, less_eq}},
-                {mal::MalSymbol{">"}, mal::MalNativeFn{1, true, greater}},
-                {mal::MalSymbol{">="}, mal::MalNativeFn{1, true, greater_eq}},
-                {mal::MalSymbol{"<=>"}, mal::MalNativeFn{2, false, compare}},
-                {mal::MalSymbol{"eval"}, mal::MalNativeFn{1, false,eval}},
-        }
+        env->definitions()
     };
+}
+
+auto get_env(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    return env->defs();
+}
+
+auto print_env(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    return println(env, mal::MalList{{env->defs()}});
 }
 
 auto eval(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
@@ -213,10 +234,10 @@ auto println(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal:
 auto read_str(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
     using namespace mal;
     if (list.val.size() != 1) {
-        throw std::runtime_error("Expected 1 argument to read-str, received " + std::to_string(list.val.size()));
+        throw std::runtime_error("Expected 1 argument to read-string, received " + std::to_string(list.val.size()));
     }
     else if (!list.val[0].is_string()) {
-        throw std::runtime_error("Expected first argument read-str to be a string, received " + mal::PRINT(list.val[0], true));
+        throw std::runtime_error("Expected first argument read-string to be a string, received " + mal::PRINT(list.val[0], true));
     }
     return READ(std::get<MalString>(list.val[0].val).val);
 }
