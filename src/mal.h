@@ -1,0 +1,166 @@
+#pragma once
+
+#include <string>
+#include <vector>
+#include <optional>
+#include <variant>
+#include <map>
+
+namespace mal {
+    class Reader {
+        size_t position = 0;
+        std::vector<std::string> tokens;
+    public:
+        explicit Reader(std::vector<std::string> tokens);
+        auto next() -> std::optional<std::string>;
+        [[nodiscard]] auto peek() const -> std::optional<std::string>;
+    };
+
+    struct MalList;
+    struct MalSymbol;
+    struct MalInteger;
+    struct MalString;
+    struct MalKeyword;
+    struct MalVector;
+    struct MalData;
+    struct MalNil;
+    struct MalMap;
+    struct MalNativeFn;
+    struct MalEnv;
+    struct MalBoolean;
+    struct MalFn;
+    struct MalNs;
+    typedef std::variant<MalNil, MalBoolean, MalInteger, MalKeyword, MalSymbol, MalString, MalList, MalVector, MalMap, MalFn, MalNativeFn> MalVariant;
+
+    struct MalNil {};
+    struct MalList { std::vector<MalData> val; };
+    struct MalSymbol {
+        std::string val;
+        auto operator<=>(const mal::MalSymbol& right) const -> std::strong_ordering;
+        inline auto operator==(const mal::MalSymbol& right)const  { return (*this <=> right) == std::strong_ordering::equivalent; }
+        inline auto operator!=(const mal::MalSymbol& right) const { return (*this <=> right) != std::strong_ordering::equivalent; }
+        inline auto operator<(const mal::MalSymbol& right) const { return (*this <=> right) == std::strong_ordering::less; }
+        inline auto operator>(const mal::MalSymbol& right) const { return (*this <=> right) == std::strong_ordering::greater; }
+        inline auto operator<=(const mal::MalSymbol& right) const {
+            auto cmp = (*this <=> right);
+            return cmp == std::strong_ordering::less || cmp == std::strong_ordering::equivalent;
+        }
+        inline auto operator>=(const mal::MalSymbol& right) const {
+            auto cmp = (*this <=> right);
+            return cmp == std::strong_ordering::greater || cmp == std::strong_ordering::equivalent;
+        }
+    };
+    struct MalBoolean { bool val; };
+    struct MalInteger { int64_t val; };
+    struct MalString { std::string val; };
+    struct MalKeyword { std::string val; };
+    struct MalVector { std::vector<MalData> val; };
+    struct MalMap { std::map<MalData, MalData> val; };
+    struct MalFn {
+        std::vector<MalSymbol> bindings;
+        std::vector<MalData> exprs;
+        std::shared_ptr<MalEnv> closureScope;
+        auto operator()(const mal::MalList& args) const -> MalData;
+    };
+    struct MalNativeFn {
+        size_t num_args;
+        bool variadic;
+        std::function<MalData (std::shared_ptr<MalEnv>, const MalList&)> fn;
+        auto operator()(std::shared_ptr<MalEnv> env, const mal::MalList& args) const -> MalData;
+    };
+    struct MalData {
+        MalVariant val = MalNil{};
+
+        auto operator<=>(const mal::MalData& right) const -> std::strong_ordering;
+        inline auto operator==(const mal::MalData& right)const  { return (*this <=> right) == std::strong_ordering::equivalent; }
+        inline auto operator!=(const mal::MalData& right) const { return (*this <=> right) != std::strong_ordering::equivalent; }
+        inline auto operator<(const mal::MalData& right) const { return (*this <=> right) == std::strong_ordering::less; }
+        inline auto operator>(const mal::MalData& right) const { return (*this <=> right) == std::strong_ordering::greater; }
+        inline auto operator<=(const mal::MalData& right) const {
+            auto cmp = (*this <=> right);
+            return cmp == std::strong_ordering::less || cmp == std::strong_ordering::equivalent;
+        }
+        inline auto operator>=(const mal::MalData& right) const {
+            auto cmp = (*this <=> right);
+            return cmp == std::strong_ordering::greater || cmp == std::strong_ordering::equivalent;
+        }
+        [[nodiscard]] auto is_nil() const { return std::holds_alternative<MalNil>(val); }
+        [[nodiscard]] auto is_int() const { return std::holds_alternative<MalInteger>(val); }
+        [[nodiscard]] auto is_keyword() const { return std::holds_alternative<MalKeyword>(val); }
+        [[nodiscard]] auto is_symbol() const { return std::holds_alternative<MalSymbol>(val); }
+        [[nodiscard]] auto is_string() const { return std::holds_alternative<MalString>(val); }
+        [[nodiscard]] auto is_list() const { return std::holds_alternative<MalList>(val); }
+        [[nodiscard]] auto is_vec() const { return std::holds_alternative<MalVector>(val); }
+        [[nodiscard]] auto is_map() const { return std::holds_alternative<MalMap>(val); }
+        [[nodiscard]] auto is_native_fn() const { return std::holds_alternative<MalNativeFn>(val); }
+        [[nodiscard]] auto is_user_fn() const { return std::holds_alternative<MalFn>(val); }
+        [[nodiscard]] auto is_bool() const { return std::holds_alternative<MalBoolean>(val); }
+        [[nodiscard]] auto is_falsey() const { return is_nil() || (*this) == MalData{MalBoolean{false}}; }
+        [[nodiscard]] auto is_truthy() const { return !is_falsey(); }
+
+        [[nodiscard]] auto is_seq() const { return is_list() || is_vec(); }
+        [[nodiscard]] auto is_number() const { return is_int(); }
+        [[nodiscard]] auto is_string_like() const { return is_string() || is_keyword() || is_symbol(); }
+        [[nodiscard]] auto is_fn() const { return is_native_fn() || is_user_fn(); }
+    };
+
+    struct MalNs {
+        std::string name;
+        std::map<MalSymbol, MalData> mappings;
+    };
+
+    auto core_ns() -> MalNs;
+
+    class MalEnv {
+        std::map<MalSymbol, MalData> defined = {};
+        std::shared_ptr<MalEnv> outer = nullptr;
+    public:
+        MalEnv();
+        explicit MalEnv(std::shared_ptr<MalEnv> outer): outer(outer) {}
+        MalEnv(std::shared_ptr<MalEnv> outer, std::map<MalSymbol, MalData> bindings): outer(outer), defined(bindings) {}
+
+        class MalEnvEntry {
+            MalEnv& env;
+            MalSymbol key;
+        public:
+            MalEnvEntry(MalEnv& env, MalSymbol key) : env(env), key(key) {}
+
+            MalData& operator=(MalData data) {
+                env.defined[key] = data;
+                return env.defined[key];
+            }
+
+            operator MalData() const {
+                if (env.defined.contains(key)) {
+                    return env.defined[key];
+                }
+                else if (env.outer != nullptr) {
+                    return (*env.outer)[key];
+                }
+                else {
+                    throw std::runtime_error("Key '" + key.val + "' not found!");
+                }
+            }
+        };
+
+        MalEnvEntry operator[](MalSymbol key) {
+            return MalEnvEntry{*this, key};
+        }
+    };
+
+    auto READ(std::string str) -> mal::MalData;
+    auto EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData;
+    auto PRINT(const mal::MalData& data, bool print_readably = true) -> std::string;
+    auto rep(std::shared_ptr<MalEnv> env, std::string str, bool print_readably = true) -> std::string;
+
+    auto hash(const mal::MalData& obj) -> size_t;
+}
+
+template <>
+struct std::hash<mal::MalData>
+{
+    std::size_t operator()(const mal::MalData& k) const
+    {
+        return mal::hash(k);
+    }
+};
