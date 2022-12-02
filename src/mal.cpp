@@ -197,21 +197,6 @@ auto mal::MalNativeFn::operator()(std::shared_ptr<MalEnv> env, const mal::MalLis
     return fn(std::move(env), args);
 }
 
-auto mal::MalFn::operator()(const mal::MalList& args) const -> MalData {
-    if (args.val.size() != bindings.size()) {
-        throw std::runtime_error("Expected '" + std::to_string(bindings.size()) + "' args to func call, received '" + std::to_string(args.val.size()) + "' instead!");
-    }
-    auto fnEnv = std::make_shared<MalEnv>(closureScope);
-    for (size_t i = 0; i < bindings.size(); ++i) {
-        (*fnEnv)[bindings[i]] = EVAL(fnEnv, args.val[i]);
-    }
-    auto lastEval = MalData{};
-    for (const auto& expr : exprs) {
-        lastEval = mal::EVAL(fnEnv, expr);
-    }
-    return lastEval;
-}
-
 auto mal::MalSymbol::operator<=>(const mal::MalSymbol &right) const -> std::strong_ordering {
     return compare_str(val, right.val);
 }

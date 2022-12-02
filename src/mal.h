@@ -35,7 +35,18 @@ namespace mal {
     struct MalNil {};
     struct MalList { std::vector<MalData> val; };
     struct MalSymbol {
-        std::string val;
+        std::string val{};
+
+        MalSymbol() = default;
+        MalSymbol(std::string val) : val(std::move(val)) {}
+        MalSymbol(const MalSymbol& o) : val(o.val) {}
+        MalSymbol(MalSymbol&& o) noexcept : val(std::move(o.val)) {}
+        auto operator=(const MalSymbol& o) -> MalSymbol& = default;
+        auto operator=(MalSymbol&& o) noexcept -> MalSymbol& {
+            std::swap(val, o.val);
+            return *this;
+        }
+
         auto operator<=>(const mal::MalSymbol& right) const -> std::strong_ordering;
         inline auto operator==(const mal::MalSymbol& right)const  { return (*this <=> right) == std::strong_ordering::equivalent; }
         inline auto operator!=(const mal::MalSymbol& right) const { return (*this <=> right) != std::strong_ordering::equivalent; }
@@ -60,7 +71,6 @@ namespace mal {
         std::vector<MalSymbol> bindings;
         std::vector<MalData> exprs;
         std::shared_ptr<MalEnv> closureScope;
-        auto operator()(const mal::MalList& args) const -> MalData;
     };
     struct MalNativeFn {
         size_t num_args;
@@ -70,6 +80,26 @@ namespace mal {
     };
     struct MalData {
         MalVariant val = MalNil{};
+
+        MalData() = default;
+        MalData(MalNil v) : val(std::move(v)) {};
+        MalData(MalBoolean v) : val(v) {};
+        MalData(MalInteger v) : val(v) {};
+        MalData(MalKeyword v) : val(std::move(v)) {};
+        MalData(MalSymbol v) : val(std::move(v)) {};
+        MalData(MalString v) : val(std::move(v)) {};
+        MalData(MalList v) : val(std::move(v)) {};
+        MalData(MalVector v) : val(std::move(v)) {};
+        MalData(MalMap v) : val(std::move(v)) {};
+        MalData(MalFn v) : val(std::move(v)) {};
+        MalData(MalNativeFn v) : val(std::move(v)) {};
+        MalData(const MalData& o) : val(o.val) {};
+        MalData(MalData&& o) noexcept : val(std::move(o.val)) {};
+        auto operator=(const MalData& o) -> MalData& = default;
+        auto operator=(MalData&& o)  noexcept -> MalData& {
+            std::swap(val, o.val);
+            return *this;
+        }
 
         auto operator<=>(const mal::MalData& right) const -> std::strong_ordering;
         inline auto operator==(const mal::MalData& right)const  { return (*this <=> right) == std::strong_ordering::equivalent; }
