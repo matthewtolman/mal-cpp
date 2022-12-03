@@ -99,6 +99,7 @@ namespace mal {
         std::vector<MalSymbol> bindings;
         std::vector<MalData> exprs;
         std::shared_ptr<MalEnv> closureScope;
+        bool is_variadic = false;
         bool is_macro = false;
         auto operator()(std::shared_ptr<MalEnv> env, const mal::MalList& args) const -> MalData;
     };

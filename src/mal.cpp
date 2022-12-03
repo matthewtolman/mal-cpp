@@ -129,6 +129,10 @@ auto mal::MalData::operator<=>(const mal::MalData& right) const -> std::strong_o
             return fn::get_address(l.fn) <=> fn::get_address(r.fn);
         },
         [](const mal::MalFn& l, const mal::MalFn& r) -> std::strong_ordering {
+            auto variadicOrder = l.is_variadic <=> r.is_variadic;
+            if (variadicOrder != 0) {
+                return variadicOrder;
+            }
             auto macroOrder = l.is_macro <=> r.is_macro;
             if (macroOrder != 0) {
                 return macroOrder;
@@ -193,7 +197,7 @@ auto mal::hash(const mal::MalData &obj) -> size_t {
                 return hashes::hash_combine(index, o.num_args, o.variadic);
             },
             [&index](const mal::MalFn& o) {
-                return hashes::hash_combine(index, o.is_macro, o.closureScope, o.bindings.size(), o.exprs.size());
+                return hashes::hash_combine(index, o.is_variadic, o.is_macro, o.closureScope, o.bindings.size(), o.exprs.size());
             },
             [&index](const auto &o) {
                 return hashes::hash_combine(index, o.val);
@@ -210,13 +214,27 @@ auto mal::MalNativeFn::operator()(std::shared_ptr<MalEnv> env, const mal::MalLis
 }
 
 auto mal::MalFn::operator()(std::shared_ptr<MalEnv> env, const mal::MalList& args) const -> MalData {
-    if (args.val.size() != bindings.size()) {
+    if (args.val.size() < bindings.size() || (!is_variadic && args.val.size() > bindings.size())) {
         throw std::runtime_error("Expected '" + std::to_string(bindings.size()) + "' args to func call, received '" + std::to_string(args.val.size()) + "' instead!");
     }
     env = std::make_shared<MalEnv>(env);
     env->mergeWith(closureScope);
-    for (size_t i = 0; i < bindings.size(); ++i) {
-        (*env)[bindings[i]] = EVAL(env, args.val[i]);
+    if (!is_variadic) {
+        for (size_t i = 0; i < bindings.size(); ++i) {
+            (*env)[bindings[i]] = EVAL(env, args.val[i]);
+        }
+    }
+    else {
+        for (size_t i = 0; i < bindings.size() - 1; ++i) {
+            (*env)[bindings[i]] = EVAL(env, args.val[i]);
+        }
+        auto res = mal::MalVector{};
+        auto count = static_cast<int64_t>(args.val.size()) - static_cast<int64_t>(bindings.size()) + 1;
+        if (count < 1) {
+            count = 1;
+        }
+        res.val.reserve(count);
+        std::copy(bindings.begin() + (bindings.size() - 1), bindings.end(), std::back_inserter(res.val));
     }
     for (size_t i = 1; i < exprs.size() - 1; ++i) {
         EVAL(env, exprs[i]);

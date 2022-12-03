@@ -40,6 +40,7 @@ static auto nth(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> m
 static auto first(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
 static auto rest(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
 static auto throw_err(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto apply(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
 
 auto mal::core_ns() -> mal::MalNs {
     auto ns = mal::MalNs{
@@ -85,6 +86,7 @@ auto mal::core_ns() -> mal::MalNs {
                     {mal::MalSymbol{"first"}, mal::MalNativeFn{1, false, first}},
                     {mal::MalSymbol{"rest"}, mal::MalNativeFn{1, false, rest}},
                     {mal::MalSymbol{"throw"}, mal::MalNativeFn{1, false, throw_err}},
+                    {mal::MalSymbol{"apply"}, mal::MalNativeFn{1, true, apply}},
             }
     );
     mal::EVAL(env, mal::READ("(def! load-file (fn* (*f*) (eval (read-string (str \"(do \" (slurp *f*) \"\\nnil)\")))))"));
@@ -536,4 +538,34 @@ auto rest(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::Ma
 
 static auto vector(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
     return mal::MalVector{args.val};
+}
+
+static auto apply(std::shared_ptr<mal::MalEnv> env, const mal::MalList& list) -> mal::MalData {
+    if (!list.val[0].is_fn()) {
+        throw std::runtime_error("Expected first argument to apply to be a function!");
+    }
+    auto args = mal::MalList{};
+    args.val.reserve(list.val.size() - 1);
+    for(auto it = list.val.begin() + 1; it < list.val.end(); ++it) {
+        const auto& e = *it;
+        if (e.is_list()) {
+            for (const auto& e2 : std::get<mal::MalList>(e.val).val) {
+                args.val.emplace_back(e2);
+            }
+        }
+        else if (e.is_vec()) {
+            for (const auto &e2: std::get<mal::MalVector>(e.val).val) {
+                args.val.emplace_back(e2);
+            }
+        }
+        else {
+            args.val.emplace_back(e);
+        }
+    }
+    if (list.val[0].is_user_fn()) {
+        return std::get<mal::MalFn>(list.val[0].val)(env, args);
+    }
+    else {
+        return std::get<mal::MalNativeFn>(list.val[0].val)(env, args);
+    }
 }

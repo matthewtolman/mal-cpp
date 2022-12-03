@@ -292,4 +292,14 @@ TEST_SUITE("[mal_env][impl]") {
         REQUIRE_EQ(mal::rep(env, "(try* (+ 2 3) (catch* E 3)))"), "5");
         REQUIRE_EQ(mal::rep(env, "(try* (throw 23) (catch* E (str E 3))))"), R"("233")");
     }
+
+    TEST_CASE("apply") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(apply + 1 2 [3 4])"), "10");
+    }
+
+    TEST_CASE("variadic fn") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "((fn* [&x] (apply + x)) 1 4 2 8)"), "15");
+    }
 }

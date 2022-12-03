@@ -133,23 +133,30 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                         list.val[1].val).val;
                 auto args = std::vector<MalSymbol>{};
                 args.reserve(argsData.size());
+                bool variadic = false;
                 for (const auto &data: argsData) {
-                    if (!data.is_symbol()) {
-                        throw std::runtime_error(
-                                "Expected symbol in bindings arg for 'fn*', received " + PRINT(data, true) + "!");
+                    if (data == MalSymbol{"&"}) {
+                        variadic = true;
                     }
-                    args.emplace_back(std::get<MalSymbol>(data.val));
+                    else if (data.is_symbol() && std::get<MalSymbol>(data.val).val.starts_with("&")) {
+                        auto argSym = MalSymbol{std::get<MalSymbol>(data.val).val.substr(1)};
+                        variadic = true;
+                        args.emplace_back(argSym);
+                    }
+                    else {
+                        if (!data.is_symbol()) {
+                            throw std::runtime_error(
+                                    "Expected symbol in bindings arg for 'fn*', received " + PRINT(data, true) + "!");
+                        }
+                        args.emplace_back(std::get<MalSymbol>(data.val));
+                    }
                 }
                 auto exprs = std::vector<MalData>{};
                 exprs.reserve(list.val.size() - 2);
                 for (size_t i = 2; i < list.val.size(); ++i) {
                     exprs.emplace_back(list.val[i]);
                 }
-                return MalFn{
-                                args,
-                                exprs,
-                                env
-                        };
+                return MalFn{args, exprs, env, variadic};
             }
             else {
                 auto evaluated_list = eval_ast(env, data);
@@ -166,13 +173,28 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                     auto fn = std::get<MalFn>(first.val);
                     eval_list.val.erase(eval_list.val.begin(), eval_list.val.begin() + 1);
 
-                    if (eval_list.val.size() != fn.bindings.size()) {
+                    if (eval_list.val.size() < fn.bindings.size() || (!fn.is_variadic && eval_list.val.size() > fn.bindings.size())) {
                         throw std::runtime_error("Expected '" + std::to_string(fn.bindings.size()) + "' args to func call, received '" + std::to_string(eval_list.val.size()) + "' instead!");
                     }
                     env = std::make_shared<MalEnv>(env);
                     env->mergeWith(fn.closureScope);
-                    for (size_t i = 0; i < fn.bindings.size(); ++i) {
-                        (*env)[fn.bindings[i]] = EVAL(env, eval_list.val[i]);
+                    if (!fn.is_variadic) {
+                        for (size_t i = 0; i < fn.bindings.size(); ++i) {
+                            (*env)[fn.bindings[i]] = EVAL(env, eval_list.val[i]);
+                        }
+                    }
+                    else {
+                        for (size_t i = 0; i < fn.bindings.size() - 1; ++i) {
+                            (*env)[fn.bindings[i]] = EVAL(env, eval_list.val[i]);
+                        }
+                        auto res = mal::MalVector{};
+                        auto count = static_cast<int64_t>(eval_list.val.size()) - static_cast<int64_t>(fn.bindings.size()) + 1;
+                        if (count < 1) {
+                            count = 1;
+                        }
+                        res.val.reserve(count);
+                        std::copy(eval_list.val.begin() + (fn.bindings.size() - 1), eval_list.val.end(), std::back_inserter(res.val));
+                        (*env)[fn.bindings[fn.bindings.size() - 1]] = res;
                     }
                     for (size_t i = 1; i < fn.exprs.size() - 1; ++i) {
                         EVAL(env, fn.exprs[i]);
