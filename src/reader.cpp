@@ -77,6 +77,34 @@ static auto read_form(mal::Reader &reader) -> std::optional<mal::MalData> {
         }
         return mal::MalList{{mal::MalSymbol{"deref"}, *read_form(reader)}};
     }
+    else if (val == "'") {
+        auto next = reader.next();
+        if (!next) {
+            throw std::runtime_error("Expected token after ' symbol");
+        }
+        return mal::MalList{{mal::MalSymbol{"quote"}, *read_form(reader)}};
+    }
+    else if (val == "`") {
+        auto next = reader.next();
+        if (!next) {
+            throw std::runtime_error("Expected token after ` symbol");
+        }
+        return mal::MalList{{mal::MalSymbol{"quasiquote"}, *read_form(reader)}};
+    }
+    else if (val == "~") {
+        auto next = reader.next();
+        if (!next) {
+            throw std::runtime_error("Expected token after ~ symbol");
+        }
+        return mal::MalList{{mal::MalSymbol{"unquote"}, *read_form(reader)}};
+    }
+    else if (val == "~@") {
+        auto next = reader.next();
+        if (!next) {
+            throw std::runtime_error("Expected token after ~@ symbol");
+        }
+        return mal::MalList{{mal::MalSymbol{"splice-unquote"}, *read_form(reader)}};
+    }
     else if (val.starts_with('"')) {
         return read_string(reader);
     }

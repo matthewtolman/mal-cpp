@@ -81,26 +81,13 @@ auto mal::core_ns() -> mal::MalNs {
 }
 
 static auto cons(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
-    if (!list.val[1].is_seq() && !list.val[1].is_string()) {
+    if (!list.val[1].is_seq()) {
         throw std::runtime_error("Argument 2 to cons must be a list, vector, or string!");
     }
-    if (list.val[1].is_list()) {
-        auto res = mal::MalList{{list.val[0]}};
-        const auto& l = std::get<mal::MalList>(list.val[1].val).val;
-        res.val.insert(res.val.end(), l.begin(), l.end());
-        return res;
-    }
-    else if (list.val[1].is_vec()) {
-        auto res = mal::MalVector{{list.val[0]}};
-        const auto& l = std::get<mal::MalVector>(list.val[1].val).val;
-        res.val.insert(res.val.end(), l.begin(), l.end());
-        return res;
-    }
-    else {
-        auto res = mal::MalString{mal::PRINT(list.val[0], false)};
-        res.val += std::get<mal::MalString>(list.val[1].val).val;
-        return res;
-    }
+    auto res = mal::MalList{{list.val[0]}};
+    const auto& l = list.val[1].is_list() ? std::get<mal::MalList>(list.val[1].val).val : std::get<mal::MalVector>(list.val[1].val).val;
+    res.val.insert(res.val.end(), l.begin(), l.end());
+    return res;
 }
 
 static auto reset(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
@@ -116,17 +103,12 @@ static auto concat(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -
     if (std::find_if_not(list.val.begin(), list.val.end(), [](const auto& v) { return v.is_seq(); }) != list.val.end()) {
         throw std::runtime_error("All arguments to concat must be lists or vectors");
     }
-    std::vector<mal::MalData> res;
+    auto res = mal::MalList{};
     for(const auto& seq : list.val) {
         const auto& elems = (seq.is_list() ? std::get<mal::MalList>(seq.val).val : std::get<mal::MalVector>(seq.val).val);
-        res.insert(res.end(), elems.begin(), elems.end());
+        res.val.insert(res.val.end(), elems.begin(), elems.end());
     }
-    if (!list.val.empty() && list.val[0].is_vec()) {
-        return mal::MalData{mal::MalVector{std::move(res)}};
-    }
-    else {
-        return mal::MalData{mal::MalList{std::move(res)}};
-    }
+    return res;
 }
 
 static auto swap(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {

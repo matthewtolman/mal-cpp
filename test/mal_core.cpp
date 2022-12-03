@@ -187,16 +187,15 @@ TEST_SUITE("[mal_env][impl]") {
     TEST_CASE("cons") {
         auto env = std::make_shared<mal::MalEnv>();
         REQUIRE_EQ(mal::rep(env, R"((cons 0 (list 1 2 5)))"), R"((0 1 2 5))");
-        REQUIRE_EQ(mal::rep(env, R"((cons 0 [1 2 5]))"), R"([0 1 2 5])");
-        REQUIRE_EQ(mal::rep(env, R"((cons 0 "[1 2 5]"))"), R"("0[1 2 5]")");
+        REQUIRE_EQ(mal::rep(env, R"((cons 0 [1 2 5]))"), R"((0 1 2 5))");
     }
 
     TEST_CASE("concat") {
         auto env = std::make_shared<mal::MalEnv>();
         REQUIRE_EQ(mal::rep(env, R"((concat (list 1 2 4) (list 1 2 5)))"), R"((1 2 4 1 2 5))");
         REQUIRE_EQ(mal::rep(env, R"((concat (list 1 2 4) [1 2 5]))"), R"((1 2 4 1 2 5))");
-        REQUIRE_EQ(mal::rep(env, R"((concat [1 2 4] [1 2 5]))"), R"([1 2 4 1 2 5])");
-        REQUIRE_EQ(mal::rep(env, R"((concat [] (list 1 4) (list 3 4)))"), R"([1 4 3 4])");
+        REQUIRE_EQ(mal::rep(env, R"((concat [1 2 4] [1 2 5]))"), R"((1 2 4 1 2 5))");
+        REQUIRE_EQ(mal::rep(env, R"((concat [] (list 1 4) (list 3 4)))"), R"((1 4 3 4))");
         REQUIRE_EQ(mal::rep(env, R"((concat (list) (list 1 4) (list 3 4)))"), R"((1 4 3 4))");
         REQUIRE_EQ(mal::rep(env, R"((concat))"), R"(())");
     }
@@ -205,6 +204,8 @@ TEST_SUITE("[mal_env][impl]") {
         auto env = std::make_shared<mal::MalEnv>();
         REQUIRE_EQ(mal::rep(env, R"((quote abc))"), R"(abc)");
         REQUIRE_EQ(mal::rep(env, R"((quote (1 4 2 3)))"), R"((1 4 2 3))");
+        REQUIRE_EQ(mal::rep(env, R"('abc)"), R"(abc)");
+        REQUIRE_EQ(mal::rep(env, R"('(1 4 2 3))"), R"((1 4 2 3))");
     }
 
     TEST_CASE("quasiquoteexpand") {
@@ -213,12 +214,20 @@ TEST_SUITE("[mal_env][impl]") {
                 mal::rep(env, R"((quasiquoteexpand (quasiquote (4 (splice-unquote (list 3 2 4)) 9))))"),
                 R"((cons (quasiquote 4) (concat (list 3 2 4) (cons (quasiquote 9) ()))))"
         );
+        REQUIRE_EQ(
+                mal::rep(env, R"((quasiquoteexpand `(4 ~@(list 3 2 4) ~(list 2) 9)))"),
+                R"((cons (quasiquote 4) (concat (list 3 2 4) (cons (quasiquote (unquote (list 2))) (cons (quasiquote 9) ())))))"
+        );
     }
 
     TEST_CASE("quasiquote") {
         auto env = std::make_shared<mal::MalEnv>();
         REQUIRE_EQ(
                 mal::rep(env, R"((quasiquote (4 (splice-unquote (list 3 2 4)) (unquote (list 2)) 9)))"),
+                R"((4 3 2 4 (2) 9))"
+        );
+        REQUIRE_EQ(
+                mal::rep(env, R"(`(4 ~@(list 3 2 4) ~(list 2) 9))"),
                 R"((4 3 2 4 (2) 9))"
         );
     }
