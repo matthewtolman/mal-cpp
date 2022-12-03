@@ -33,6 +33,13 @@ static auto reset(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) ->
 static auto swap(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto cons(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto concat(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto is_macro(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto is_vector(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto vector(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto nth(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto first(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto rest(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto throw_err(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
 
 auto mal::core_ns() -> mal::MalNs {
     auto ns = mal::MalNs{
@@ -53,6 +60,8 @@ auto mal::core_ns() -> mal::MalNs {
                     {mal::MalSymbol{"slurp"}, mal::MalNativeFn{1, false, slurp}},
                     {mal::MalSymbol{"list"}, mal::MalNativeFn{0, true, list}},
                     {mal::MalSymbol{"list?"}, mal::MalNativeFn{1, false, is_list}},
+                    {mal::MalSymbol{"vec"}, mal::MalNativeFn{0, true, vector}},
+                    {mal::MalSymbol{"vec?"}, mal::MalNativeFn{1, false, is_vector}},
                     {mal::MalSymbol{"empty?"}, mal::MalNativeFn{1, false, is_empty}},
                     {mal::MalSymbol{"count"}, mal::MalNativeFn{1, false, count}},
                     {mal::MalSymbol{"="}, mal::MalNativeFn{1, true, equals}},
@@ -71,13 +80,23 @@ auto mal::core_ns() -> mal::MalNs {
                     {mal::MalSymbol{"swap!"}, mal::MalNativeFn{2, true, swap}},
                     {mal::MalSymbol{"cons"}, mal::MalNativeFn{2, false, cons}},
                     {mal::MalSymbol{"concat"}, mal::MalNativeFn{0, true, concat}},
+                    {mal::MalSymbol{"macro?"}, mal::MalNativeFn{1, false, is_macro}},
+                    {mal::MalSymbol{"nth"}, mal::MalNativeFn{2, false, nth}},
+                    {mal::MalSymbol{"first"}, mal::MalNativeFn{1, false, first}},
+                    {mal::MalSymbol{"rest"}, mal::MalNativeFn{1, false, rest}},
+                    {mal::MalSymbol{"throw"}, mal::MalNativeFn{1, false, throw_err}},
             }
     );
     mal::EVAL(env, mal::READ("(def! load-file (fn* (*f*) (eval (read-string (str \"(do \" (slurp *f*) \"\\nnil)\")))))"));
+    mal::EVAL(env, mal::READ("(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to cond\")) (cons 'cond (rest (rest xs)))))))"));
     return mal::MalNs{
         "core",
         env->definitions()
     };
+}
+
+auto throw_err(std::shared_ptr<mal::MalEnv> env, const mal::MalList& list) -> mal::MalData {
+    throw std::runtime_error(mal::PRINT(list.val[0], false));
 }
 
 static auto cons(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
@@ -466,4 +485,55 @@ auto mal::Atom::swap(const std::function<MalData(const MalData& d)>& fn) -> MalD
 #endif
     *md = fn(*md);
     return *md;
+}
+
+auto is_macro(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    return mal::MalBoolean{args.val[0].is_macro()};
+}
+
+auto is_vector(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    return mal::MalBoolean{args.val[0].is_vec()};
+}
+
+auto nth(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_seq()) {
+        throw std::runtime_error("First argument to nth must be a list or vector.");
+    }
+    if (!args.val[1].is_int()) {
+        throw std::runtime_error("Second argument to nth must be an integer.");
+    }
+    return (args.val[0].is_list()
+            ? std::get<mal::MalList>(args.val[0].val).val
+            : std::get<mal::MalVector>(args.val[0].val).val)[std::get<mal::MalInteger>(args.val[1].val).val];
+}
+
+auto first(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_seq()) {
+        return mal::MalData{};
+    }
+    const auto& seq = (args.val[0].is_list()
+                       ? std::get<mal::MalList>(args.val[0].val).val
+                       : std::get<mal::MalVector>(args.val[0].val).val);
+    if (seq.empty()) {
+        return mal::MalData{};
+    }
+    return seq[0];
+}
+
+auto rest(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_seq()) {
+        return mal::MalData{};
+    }
+    auto seq = (args.val[0].is_list()
+                       ? std::get<mal::MalList>(args.val[0].val).val
+                       : std::get<mal::MalVector>(args.val[0].val).val);
+    if (seq.empty()) {
+        return mal::MalData{};
+    }
+    seq.erase(seq.begin(), seq.begin() + 1);
+    return mal::MalList{seq};
+}
+
+static auto vector(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    return mal::MalVector{args.val};
 }

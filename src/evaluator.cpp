@@ -5,10 +5,13 @@ static auto eval_ast(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal:
 static auto pair_list(const std::vector<mal::MalData>& data) -> std::vector<std::pair<mal::MalSymbol, mal::MalData>>;
 static auto map_entries(std::map<mal::MalData, mal::MalData> data) -> std::vector<std::pair<mal::MalSymbol, mal::MalData>>;
 static auto quasiquote(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal::MalData;
+static auto macro_expand(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal::MalData;
+static auto is_macro_call(std::shared_ptr<mal::MalEnv> env, const mal::MalData& ast) -> bool;
 
 auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
     while (true) {
         if (data.is_list()) {
+            data = macro_expand(env, data);
             const auto &list = std::get<MalList>(data.val);
             if (list.val.empty()) {
                 return data;
@@ -24,6 +27,22 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                     return dEnv[std::get<MalSymbol>(list.val[1].val)] = EVAL(env, list.val[2]);
                 }
             }
+            else if (list.val[0] == MalSymbol{"defmacro!"}) {
+                if (list.val.size() != 3) {
+                    throw std::runtime_error(
+                            "Expected 2 arguments to 'def!', received " + std::to_string(list.val.size() - 1));
+                } else if (!list.val[1].is_symbol()) {
+                    throw std::runtime_error("Expected first argument to 'def!' to be a symbol!");
+                } else {
+                    auto& dEnv = env->root();
+                    auto val = EVAL(env, list.val[2]);
+                    if (!val.is_user_fn()) {
+                        throw std::runtime_error("Macros must be functions!");
+                    }
+                    std::get<mal::MalFn>(val.val).is_macro = true;
+                    return dEnv[std::get<MalSymbol>(list.val[1].val)] = val;
+                }
+            }
             else if (list.val[0] == MalSymbol{"quasiquoteexpand"}) {
                 if (!list.val[1].is_list() || std::get<mal::MalList>(list.val[1].val).val.size() != 2 || std::get<mal::MalList>(list.val[1].val).val[0] != mal::MalSymbol{"quasiquote"}) {
                     throw std::runtime_error("Expected quasiquoteexpend in form (quasiquoteexpand (quasiquote <to-expand>))");
@@ -34,8 +53,27 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                 auto quoted = mal::quasiquote(env, list.val[1]);
                 std::swap(data, quoted);
             }
+            else if (list.val[0] == MalSymbol{"macroexpand"}) {
+                return macro_expand(env, list.val[1]);
+            }
             else if (list.val[0] == MalSymbol{"quote"}) {
                 return list.val[1];
+            }
+            else if (list.val[0] == MalSymbol{"try*"}) {
+                const auto& c = std::get<mal::MalList>(list.val[2].val);
+                if (c.val[0] != MalSymbol{"catch*"} || !c.val[1].is_symbol()) {
+                    throw std::runtime_error("Invalid catch* for try*");
+                }
+                try {
+                    return EVAL(env, list.val[1]);
+                }
+                catch (const std::runtime_error& e) {
+                    auto sym = std::get<mal::MalSymbol>(c.val[1].val);
+                    env = std::make_shared<mal::MalEnv>(env);
+                    (*env)[sym] = MalString{e.what()};
+                    auto cpy = c.val[2];
+                    std::swap(data, cpy);
+                }
             }
             else if (list.val[0] == MalSymbol{"let*"}) {
                 if (list.val.size() != 3) {
@@ -242,4 +280,34 @@ auto mal::quasiquote(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal:
     else {
         return mal::MalList{{mal::MalSymbol{"quote"}, ast}};
     }
+}
+
+auto macro_expand(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal::MalData {
+    while (is_macro_call(env, ast)) {
+        auto list = std::get<mal::MalList>(ast.val);
+        mal::MalData mapping = (*env)[std::get<mal::MalSymbol>(list.val[0].val)];
+        auto call = std::get<mal::MalFn>(mapping.val);
+        list.val.erase(list.val.begin(), list.val.begin() + 1);
+        ast = call(env, list);
+    }
+    return ast;
+}
+
+auto is_macro_call(std::shared_ptr<mal::MalEnv> env, const mal::MalData& ast) -> bool {
+    if (!ast.is_list()) {
+        return false;
+    }
+    const auto& list = std::get<mal::MalList>(ast.val);
+    if (list.val.empty()) {
+        return false;
+    }
+    if (!list.val[0].is_symbol()) {
+        return false;
+    }
+    const auto& sym = std::get<mal::MalSymbol>(list.val[0].val);
+    if (!env->contains(sym)) {
+        return false;
+    }
+    mal::MalData mapping = (*env)[sym];
+    return mapping.is_macro();
 }

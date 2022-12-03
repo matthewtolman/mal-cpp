@@ -231,4 +231,65 @@ TEST_SUITE("[mal_env][impl]") {
                 R"((4 3 2 4 (2) 9))"
         );
     }
+
+    TEST_CASE("macro?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        mal::rep(env, R"((defmacro! add2 (fn* [a] (list + a 2))))");
+        mal::rep(env, R"((def! add3 (fn* [a] (+ a 3))))");
+        REQUIRE_EQ(mal::rep(env, "(macro? add2)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(macro? add3)"), "false");
+    }
+
+    TEST_CASE("macroexpand") {
+        auto env = std::make_shared<mal::MalEnv>();
+        mal::rep(env, R"((defmacro! add2 (fn* [a] (list + a 2))))");
+        REQUIRE_EQ(mal::rep(env, "(macroexpand (add2 4))"), "(#<native_function> 4 2)");
+    }
+
+    TEST_CASE("macros") {
+        auto env = std::make_shared<mal::MalEnv>();
+        mal::rep(env, R"((defmacro! add2 (fn* [a] (list + a 2))))");
+        REQUIRE_EQ(mal::rep(env, "(add2 4)"), "6");
+    }
+
+    TEST_CASE("nth") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(nth (list 2 4 5) 1)"), "4");
+        REQUIRE_EQ(mal::rep(env, "(nth [2 4 5] 1)"), "4");
+    }
+
+    TEST_CASE("rest") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(rest (list 2 4 5))"), "(4 5)");
+        REQUIRE_EQ(mal::rep(env, "(rest [2 4 5])"), "(4 5)");
+    }
+
+    TEST_CASE("first") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(first (list 2 4 5))"), "2");
+        REQUIRE_EQ(mal::rep(env, "(first [2 4 5])"), "2");
+        REQUIRE_EQ(mal::rep(env, "(first [])"), "nil");
+        REQUIRE_EQ(mal::rep(env, "(first nil)"), "nil");
+    }
+
+    TEST_CASE("vec") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(vec 2 4 5)"), "[2 4 5]");
+    }
+
+    TEST_CASE("vec?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(vec? [2 4 5])"), "true");
+    }
+
+    TEST_CASE("throw") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_THROWS_AS(mal::rep(env, "(throw 93)"), std::runtime_error);
+    }
+
+    TEST_CASE("try/catch") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(try* (+ 2 3) (catch* E 3)))"), "5");
+        REQUIRE_EQ(mal::rep(env, "(try* (throw 23) (catch* E (str E 3))))"), R"("233")");
+    }
 }

@@ -129,6 +129,10 @@ auto mal::MalData::operator<=>(const mal::MalData& right) const -> std::strong_o
             return fn::get_address(l.fn) <=> fn::get_address(r.fn);
         },
         [](const mal::MalFn& l, const mal::MalFn& r) -> std::strong_ordering {
+            auto macroOrder = l.is_macro <=> r.is_macro;
+            if (macroOrder != 0) {
+                return macroOrder;
+            }
             auto envOrder = &(*l.closureScope) <=> &(*r.closureScope);
             if (envOrder != 0) {
                 return envOrder;
@@ -189,7 +193,7 @@ auto mal::hash(const mal::MalData &obj) -> size_t {
                 return hashes::hash_combine(index, o.num_args, o.variadic);
             },
             [&index](const mal::MalFn& o) {
-                return hashes::hash_combine(index, o.closureScope, o.bindings.size(), o.exprs.size());
+                return hashes::hash_combine(index, o.is_macro, o.closureScope, o.bindings.size(), o.exprs.size());
             },
             [&index](const auto &o) {
                 return hashes::hash_combine(index, o.val);

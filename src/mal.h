@@ -99,6 +99,7 @@ namespace mal {
         std::vector<MalSymbol> bindings;
         std::vector<MalData> exprs;
         std::shared_ptr<MalEnv> closureScope;
+        bool is_macro = false;
         auto operator()(std::shared_ptr<MalEnv> env, const mal::MalList& args) const -> MalData;
     };
     struct MalNativeFn {
@@ -164,6 +165,7 @@ namespace mal {
         [[nodiscard]] auto is_number() const { return is_int(); }
         [[nodiscard]] auto is_string_like() const { return is_string() || is_keyword() || is_symbol(); }
         [[nodiscard]] auto is_fn() const { return is_native_fn() || is_user_fn(); }
+        [[nodiscard]] auto is_macro() const { return is_user_fn() && std::get<mal::MalFn>(val).is_macro; }
     };
 
     struct MalNs {
@@ -215,10 +217,10 @@ namespace mal {
             MalEnv& env;
             MalSymbol key;
         public:
-            MalEnvEntry(MalEnv& env, MalSymbol key) : env(env), key(key) {}
+            MalEnvEntry(MalEnv& env, MalSymbol key) : env(env), key(std::move(key)) {}
 
-            MalData& operator=(MalData data) {
-                env.defined[key] = data;
+            auto operator=(MalData data) -> MalData&{
+                env.defined[key] = std::move(data);
                 return env.defined[key];
             }
 
@@ -235,8 +237,20 @@ namespace mal {
             }
         };
 
-        MalEnvEntry operator[](MalSymbol key) {
+        auto operator[](const MalSymbol& key) -> MalEnvEntry{
             return MalEnvEntry{*this, key};
+        }
+
+        auto contains(const MalSymbol& key) const -> bool{
+            if (defined.contains(key)) {
+                return true;
+            }
+            else if (outer != nullptr) {
+                return outer->contains(key);
+            }
+            else {
+                return false;
+            }
         }
     };
 
