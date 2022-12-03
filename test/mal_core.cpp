@@ -302,4 +302,146 @@ TEST_SUITE("[mal_env][impl]") {
         auto env = std::make_shared<mal::MalEnv>();
         REQUIRE_EQ(mal::rep(env, "((fn* [&x] (apply + x)) 1 4 2 8)"), "15");
     }
+
+    TEST_CASE("variadic fn") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "((fn* [&x] (apply + x)) 1 4 2 8)"), "15");
+    }
+
+    TEST_CASE("map") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(map (fn* [x] (* x x)) (list 1 2 3 4))"), "(1 4 9 16)");
+        REQUIRE_EQ(mal::rep(env, "(map (fn* [x] (* x x)) (vec 1 2 3 4))"), "(1 4 9 16)");
+        REQUIRE_EQ(mal::rep(env, R"((map (fn* [x] (str x x)) "hello"))"), R"(("hh" "ee" "ll" "ll" "oo"))");
+        REQUIRE_EQ(mal::rep(env, "(map (fn* [x] (* (first x) (nth x 1))) {1 2 3 4})"), "(2 12)");
+        REQUIRE_EQ(mal::rep(env, R"((map str [:a :b :c] (list 9 5 4 2) {1 2 3 4} "abcde"))"), R"((":a9[1 2]a" ":b5[3 4]b" ":c4nilc" "nil2nild" "nilnilnile"))");
+    }
+
+    TEST_CASE("nil?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(nil? nil)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(nil? 5)"), "false");
+    }
+
+    TEST_CASE("keyword?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(keyword? :abc)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(keyword? 5)"), "false");
+    }
+
+    TEST_CASE("keyword?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(keyword? :abc)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(keyword? 5)"), "false");
+    }
+
+    TEST_CASE("symbol?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(symbol? 'abc)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(symbol? 5)"), "false");
+    }
+
+    TEST_CASE("hash-map?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(hash-map? {'abc 5})"), "true");
+        REQUIRE_EQ(mal::rep(env, "(hash-map? 5)"), "false");
+    }
+
+    TEST_CASE("hash-map") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(hash-map 'abc 5)"), "{abc 5}");
+        REQUIRE_EQ(mal::rep(env, "(hash-map 4 5 6)"), "{4 5 6 nil}");
+    }
+
+    TEST_CASE("true?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(true? true)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(true? 5)"), "false");
+    }
+
+    TEST_CASE("false?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(false? false)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(false? nil)"), "false");
+    }
+
+    TEST_CASE("truthy?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(truthy? true)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(truthy? 5)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(truthy? false)"), "false");
+    }
+
+    TEST_CASE("falsey?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(falsey? false)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(falsey? nil)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(falsey? true)"), "false");
+    }
+
+    TEST_CASE("not") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(not false)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(not nil)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(not true)"), "false");
+    }
+
+    TEST_CASE("or") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(or false false true)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(or true false false)"), "true");
+        REQUIRE_EQ(mal::rep(env, "(or false false false)"), "false");
+    }
+
+    TEST_CASE("and") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(and false false true)"), "false");
+        REQUIRE_EQ(mal::rep(env, "(and true false false)"), "false");
+        REQUIRE_EQ(mal::rep(env, "(and false false false)"), "false");
+        REQUIRE_EQ(mal::rep(env, "(and true true true)"), "true");
+    }
+
+    TEST_CASE("seq?") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(seq? [1 12])"), "true");
+        REQUIRE_EQ(mal::rep(env, "(seq? (vec 12))"), "true");
+        REQUIRE_EQ(mal::rep(env, "(seq? (hash-map))"), "false");
+        REQUIRE_EQ(mal::rep(env, "(seq? \"abc\")"), "false");
+    }
+
+    TEST_CASE("assoc") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(assoc {1 12} 'a 34 :e 4)"), "{1 12 :e 4 a 34}");
+    }
+
+    TEST_CASE("dissoc") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(dissoc {1 12 'a 34 :e 4} 1 :e)"), "{a 34}");
+    }
+
+    TEST_CASE("get") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(get {1 12 'a 34 :e 4} 1)"), "12");
+    }
+
+    TEST_CASE("entries") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(entries {1 12 'a 34 :e 4})"), "([1 12] [:e 4] [a 34])");
+    }
+
+    TEST_CASE("keys") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(keys {1 12 'a 34 :e 4})"), "(1 :e a)");
+    }
+
+    TEST_CASE("values") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(values {1 12 'a 34 :e 4})"), "(12 4 34)");
+    }
+
+    TEST_CASE("second") {
+        auto env = std::make_shared<mal::MalEnv>();
+        REQUIRE_EQ(mal::rep(env, "(second [1 4])"), "4");
+        REQUIRE_EQ(mal::rep(env, "(second [1])"), "nil");
+    }
 }

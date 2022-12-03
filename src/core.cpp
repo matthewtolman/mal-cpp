@@ -1,7 +1,9 @@
 #include "mal.h"
+#include "variant_overload.hpp"
 #include <sstream>
 #include <iostream>
 #include <fstream>
+#include <set>
 
 static auto add(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto sub(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
@@ -41,6 +43,19 @@ static auto first(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) ->
 static auto rest(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
 static auto throw_err(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
 static auto apply(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto map(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto is_symbol(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto is_keyword(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto is_hash_map(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto hash_map(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto symbol(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto keyword(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto assoc(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto dissoc(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto get(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto contains(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto entries(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
+static auto values(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData;
 
 auto mal::core_ns() -> mal::MalNs {
     auto ns = mal::MalNs{
@@ -60,10 +75,6 @@ auto mal::core_ns() -> mal::MalNs {
                     {mal::MalSymbol{"read-string"},mal::MalNativeFn{1, false, read_str}},
                     {mal::MalSymbol{"slurp"}, mal::MalNativeFn{1, false, slurp}},
                     {mal::MalSymbol{"list"}, mal::MalNativeFn{0, true, list}},
-                    {mal::MalSymbol{"list?"}, mal::MalNativeFn{1, false, is_list}},
-                    {mal::MalSymbol{"vec"}, mal::MalNativeFn{0, true, vector}},
-                    {mal::MalSymbol{"vec?"}, mal::MalNativeFn{1, false, is_vector}},
-                    {mal::MalSymbol{"empty?"}, mal::MalNativeFn{1, false, is_empty}},
                     {mal::MalSymbol{"count"}, mal::MalNativeFn{1, false, count}},
                     {mal::MalSymbol{"="}, mal::MalNativeFn{1, true, equals}},
                     {mal::MalSymbol{"<"}, mal::MalNativeFn{1, true, less}},
@@ -75,26 +86,236 @@ auto mal::core_ns() -> mal::MalNs {
                     {mal::MalSymbol{"*print-env*"}, mal::MalNativeFn{0, false, print_env}},
                     {mal::MalSymbol{"*env*"}, mal::MalNativeFn{0, false, get_env}},
                     {mal::MalSymbol{"atom"}, mal::MalNativeFn{1, false, make_atom}},
-                    {mal::MalSymbol{"atom?"}, mal::MalNativeFn{1, false, is_atom}},
                     {mal::MalSymbol{"deref"}, mal::MalNativeFn{1, false, deref}},
                     {mal::MalSymbol{"reset!"}, mal::MalNativeFn{2, false, reset}},
                     {mal::MalSymbol{"swap!"}, mal::MalNativeFn{2, true, swap}},
                     {mal::MalSymbol{"cons"}, mal::MalNativeFn{2, false, cons}},
                     {mal::MalSymbol{"concat"}, mal::MalNativeFn{0, true, concat}},
-                    {mal::MalSymbol{"macro?"}, mal::MalNativeFn{1, false, is_macro}},
                     {mal::MalSymbol{"nth"}, mal::MalNativeFn{2, false, nth}},
                     {mal::MalSymbol{"first"}, mal::MalNativeFn{1, false, first}},
                     {mal::MalSymbol{"rest"}, mal::MalNativeFn{1, false, rest}},
                     {mal::MalSymbol{"throw"}, mal::MalNativeFn{1, false, throw_err}},
                     {mal::MalSymbol{"apply"}, mal::MalNativeFn{1, true, apply}},
+                    {mal::MalSymbol{"map"}, mal::MalNativeFn{2, true, map}},
+                    {mal::MalSymbol{"vec"}, mal::MalNativeFn{0, true, vector}},
+                    {mal::MalSymbol{"list?"}, mal::MalNativeFn{1, false, is_list}},
+                    {mal::MalSymbol{"vec?"}, mal::MalNativeFn{1, false, is_vector}},
+                    {mal::MalSymbol{"empty?"}, mal::MalNativeFn{1, false, is_empty}},
+                    {mal::MalSymbol{"atom?"}, mal::MalNativeFn{1, false, is_atom}},
+                    {mal::MalSymbol{"macro?"}, mal::MalNativeFn{1, false, is_macro}},
+                    {mal::MalSymbol{"symbol?"}, mal::MalNativeFn{1, false, is_symbol}},
+                    {mal::MalSymbol{"keyword?"}, mal::MalNativeFn{1, false, is_keyword}},
+                    {mal::MalSymbol{"hash-map?"}, mal::MalNativeFn{1, false, is_hash_map}},
+                    {mal::MalSymbol{"hash-map"}, mal::MalNativeFn{0, true, hash_map}},
+                    {mal::MalSymbol{"symbol"}, mal::MalNativeFn{1, true, symbol}},
+                    {mal::MalSymbol{"keyword"}, mal::MalNativeFn{1, true, keyword}},
+                    {mal::MalSymbol{"assoc"}, mal::MalNativeFn{3, true, assoc}},
+                    {mal::MalSymbol{"dissoc"}, mal::MalNativeFn{2, true, dissoc}},
+                    {mal::MalSymbol{"get"}, mal::MalNativeFn{2, false, get}},
+                    {mal::MalSymbol{"entries"}, mal::MalNativeFn{1, false, entries}},
+                    {mal::MalSymbol{"values"}, mal::MalNativeFn{1, false, values}},
+                    {mal::MalSymbol{"contains?"}, mal::MalNativeFn{2, false, contains}},
             }
     );
     mal::EVAL(env, mal::READ("(def! load-file (fn* (*f*) (eval (read-string (str \"(do \" (slurp *f*) \"\\nnil)\")))))"));
     mal::EVAL(env, mal::READ("(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to cond\")) (cons 'cond (rest (rest xs)))))))"));
+    mal::EVAL(env, mal::READ("(def! nil? (fn* (v) (= v nil)))"));
+    mal::EVAL(env, mal::READ("(def! true? (fn* (v) (= v true)))"));
+    mal::EVAL(env, mal::READ("(def! false? (fn* (v) (= v false)))"));
+    mal::EVAL(env, mal::READ("(def! truthy? (fn* (v) (if v true false)))"));
+    mal::EVAL(env, mal::READ("(def! not (fn* (v) (if v false true)))"));
+    mal::EVAL(env, mal::READ("(def! falsey? (fn* (v) (not v)))"));
+    mal::EVAL(env, mal::READ("(def! seq? (fn* [v] (or (list? v) (vec? v))))"));
+    mal::EVAL(env, mal::READ("(def! keys (fn* [v] (map first v)))"));
+    mal::EVAL(env, mal::READ("(def! second (fn* [v] (nth v 1)))"));
     return mal::MalNs{
         "core",
         env->definitions()
     };
+}
+
+static auto values(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_map()) {
+        throw std::runtime_error("Expected argument 1 to entries to be a map");
+    }
+    auto res = mal::MalList{};
+    res.val.reserve(std::get<mal::MalMap>(args.val[0].val).val.size());
+    for (const auto& [key, value] : std::get<mal::MalMap>(args.val[0].val).val) {
+        res.val.emplace_back(value);
+    }
+    return res;
+}
+
+static auto entries(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_map()) {
+        throw std::runtime_error("Expected argument 1 to entries to be a map");
+    }
+    auto res = mal::MalList{};
+    res.val.reserve(std::get<mal::MalMap>(args.val[0].val).val.size());
+    for (const auto& [key, value] : std::get<mal::MalMap>(args.val[0].val).val) {
+        res.val.emplace_back(mal::MalVector{{key, value}});
+    }
+    return res;
+}
+
+static auto contains(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_map()) {
+        throw std::runtime_error("Expected argument 1 to contains? to be a map");
+    }
+    return mal::MalBoolean{std::get<mal::MalMap>(args.val[0].val).val.contains(args.val[1])};
+}
+
+static auto get(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_map()) {
+        throw std::runtime_error("Expected argument 1 to get to be a map");
+    }
+    const auto& mp = std::get<mal::MalMap>(args.val[0].val).val;
+    if (mp.contains(args.val[1])) {
+        return mp.at(args.val[1]);
+    }
+    else {
+        return mal::MalData{};
+    }
+}
+
+static auto assoc(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_map()) {
+        throw std::runtime_error("Expected argument 1 to assoc to be a map");
+    }
+    mal::MalMap mp = std::get<mal::MalMap>(args.val[0].val);
+    for (size_t i = 1; i < args.val.size(); i += 2) {
+        auto key = args.val[i];
+        auto val = i + 1 < args.val.size() ? args.val[i + 1] : mal::MalData{};
+        mp.val[key] = val;
+    }
+    return mp;
+}
+
+static auto dissoc(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_map()) {
+        throw std::runtime_error("Expected argument 1 to dissoc to be a map");
+    }
+    mal::MalMap mp{};
+    std::set<mal::MalData> ignoreKeys{};
+    for (size_t i = 1; i < args.val.size(); ++i) {
+        ignoreKeys.insert(args.val[i]);
+    }
+    for (const auto& [key, val] : std::get<mal::MalMap>(args.val[0].val).val) {
+        if (!ignoreKeys.contains(key)) {
+            mp.val[key] = val;
+        }
+    }
+    return mp;
+}
+
+static auto symbol(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_string()) {
+        throw std::runtime_error("Expected argument 1 to symbol to be a string");
+    }
+    return mal::MalSymbol{std::get<mal::MalString>(args.val[0].val).val};
+}
+
+static auto keyword(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    if (!args.val[0].is_string()) {
+        throw std::runtime_error("Expected argument 1 to keyword to be a string");
+    }
+    return mal::MalKeyword{std::get<mal::MalString>(args.val[0].val).val};
+}
+
+static auto hash_map(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    mal::MalMap res;
+    for (size_t i = 0; i < args.val.size(); i += 2) {
+        auto key = args.val[i];
+        auto val = i + 1 < args.val.size() ? args.val[i + 1] : mal::MalData{};
+        res.val[key] = val;
+    }
+    return res;
+}
+
+static auto is_hash_map(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    return mal::MalBoolean{args.val[0].is_map()};
+}
+
+static auto is_keyword(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    return mal::MalBoolean{args.val[0].is_keyword()};
+}
+
+static auto is_symbol(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {
+    return mal::MalBoolean{args.val[0].is_symbol()};
+}
+
+static auto map(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    if (!list.val[0].is_fn()) {
+        throw std::runtime_error("Argument 1 to map must be a function!");
+    }
+
+    size_t maxSize = 0;
+    for (size_t i = 1; i < list.val.size(); ++i) {
+        if (!list.val[i].is_seq() && !list.val[i].is_string() && !list.val[i].is_map() && !list.val[i].is_nil()) {
+            throw std::runtime_error("Argument " + std::to_string(i + 1) + " to map must be a list, vector, string, or map!");
+        }
+        auto size = std::visit(overload {
+            [](const mal::MalList& l) -> size_t { return l.val.size(); },
+            [](const mal::MalVector& l) -> size_t { return l.val.size(); },
+            [](const mal::MalString& l) -> size_t { return l.val.size(); },
+            [](const mal::MalMap& l) -> size_t { return l.val.size(); },
+            [](const auto& l) -> size_t { return 0; },
+        }, list.val[i].val);
+        maxSize = std::max(maxSize, size);
+    }
+
+    std::vector<decltype(mal::MalMap::val)::const_iterator> mapIterators{};
+    mapIterators.reserve(list.val.size());
+    for (size_t seqIndex = 1; seqIndex < list.val.size(); ++seqIndex) {
+        if (list.val[seqIndex].is_map()) {
+            mapIterators[seqIndex] = std::get<mal::MalMap>(list.val[seqIndex].val).val.begin();
+        }
+    }
+
+    std::function<mal::MalData (const mal::MalList&)> fn;
+    if (list.val[0].is_user_fn()) {
+        fn = [&list, &env](const mal::MalList& args) -> mal::MalData { return std::get<mal::MalFn>(list.val[0].val)(env, args); };
+    }
+    else {
+        fn = [&list, &env](const mal::MalList& args) -> mal::MalData { return std::get<mal::MalNativeFn>(list.val[0].val)(env, args); };
+    }
+
+    mal::MalList res;
+    res.val.reserve(maxSize);
+    for (size_t elemIndex = 0; elemIndex < maxSize; ++elemIndex) {
+        mal::MalList args;
+        args.val.reserve(list.val.size() - 1);
+        for (size_t seqIndex = 1; seqIndex < list.val.size(); ++seqIndex) {
+            auto a = std::visit(overload{
+                [&elemIndex](const mal::MalList& o) {
+                        return elemIndex < o.val.size() ? o.val[elemIndex] : mal::MalData{};
+                },
+                [&elemIndex](const mal::MalVector& o) {
+                    return elemIndex < o.val.size() ? o.val[elemIndex] : mal::MalData{};
+                },
+                [&elemIndex](const mal::MalString& o) {
+                    return elemIndex < o.val.size() ? mal::MalString{std::string(1, o.val[elemIndex])} : mal::MalData{};
+                },
+                [&mapIterators, &seqIndex](const mal::MalMap& o) {
+                    auto& it = mapIterators[seqIndex];
+                    if (it == o.val.end()) {
+                        return mal::MalData{};
+                    }
+                    auto entry = *it;
+                    auto res = mal::MalVector{{
+                        entry.first,
+                        entry.second}};
+                    ++it;
+                    return mal::MalData{res};
+                },
+                [](const auto& o) { return mal::MalData{}; }
+            }, list.val[seqIndex].val);
+
+            args.val.emplace_back(a);
+        }
+        res.val.emplace_back(fn(args));
+    }
+    return res;
 }
 
 auto throw_err(std::shared_ptr<mal::MalEnv> env, const mal::MalList& list) -> mal::MalData {
@@ -504,9 +725,14 @@ auto nth(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::Mal
     if (!args.val[1].is_int()) {
         throw std::runtime_error("Second argument to nth must be an integer.");
     }
-    return (args.val[0].is_list()
-            ? std::get<mal::MalList>(args.val[0].val).val
-            : std::get<mal::MalVector>(args.val[0].val).val)[std::get<mal::MalInteger>(args.val[1].val).val];
+    const auto& vec = (args.val[0].is_list()
+                ? std::get<mal::MalList>(args.val[0].val).val
+                : std::get<mal::MalVector>(args.val[0].val).val);
+    const auto index = std::get<mal::MalInteger>(args.val[1].val).val;
+    if (index < vec.size()) {
+        return vec[index];
+    }
+    return mal::MalData{};
 }
 
 auto first(std::shared_ptr<mal::MalEnv> env, const mal::MalList& args) -> mal::MalData {

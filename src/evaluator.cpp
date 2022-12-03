@@ -49,6 +49,24 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                 }
                 return quasiquote(env, std::get<mal::MalList>(list.val[1].val).val[1]);
             }
+            else if (list.val[0] == MalSymbol{"or"}) {
+                for (size_t i = 1; i < list.val.size(); ++i) {
+                    auto res = EVAL(env, list.val[i]);
+                    if (res != mal::MalNil{} && res != mal::MalBoolean{false}) {
+                        return MalBoolean{true};
+                    }
+                }
+                return MalBoolean{false};
+            }
+            else if (list.val[0] == MalSymbol{"and"}) {
+                for (size_t i = 1; i < list.val.size(); ++i) {
+                    auto res = EVAL(env, list.val[i]);
+                    if (res == mal::MalNil{} || res == mal::MalBoolean{false}) {
+                        return MalBoolean{false};
+                    }
+                }
+                return MalBoolean{true};
+            }
             else if (list.val[0] == MalSymbol{"quasiquote"}) {
                 auto quoted = mal::quasiquote(env, list.val[1]);
                 std::swap(data, quoted);
@@ -180,12 +198,12 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                     env->mergeWith(fn.closureScope);
                     if (!fn.is_variadic) {
                         for (size_t i = 0; i < fn.bindings.size(); ++i) {
-                            (*env)[fn.bindings[i]] = EVAL(env, eval_list.val[i]);
+                            (*env)[fn.bindings[i]] = eval_list.val[i];
                         }
                     }
                     else {
                         for (size_t i = 0; i < fn.bindings.size() - 1; ++i) {
-                            (*env)[fn.bindings[i]] = EVAL(env, eval_list.val[i]);
+                            (*env)[fn.bindings[i]] = eval_list.val[i];
                         }
                         auto res = mal::MalVector{};
                         auto count = static_cast<int64_t>(eval_list.val.size()) - static_cast<int64_t>(fn.bindings.size()) + 1;
