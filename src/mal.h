@@ -246,6 +246,7 @@ namespace mal {
     auto rep(std::shared_ptr<MalEnv> env, std::string str, bool print_readably = true) -> std::string;
 
     auto hash(const mal::MalData& obj) -> size_t;
+    auto quasiquote(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal::MalData;
 }
 
 template <>

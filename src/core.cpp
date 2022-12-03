@@ -31,11 +31,12 @@ static auto is_atom(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) 
 static auto deref(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto reset(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 static auto swap(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto cons(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
+static auto concat(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData;
 
 auto mal::core_ns() -> mal::MalNs {
     auto ns = mal::MalNs{
-        "core",
-
+        "core", {}
     };
     auto env = std::make_shared<mal::MalEnv>(
             nullptr,
@@ -61,13 +62,15 @@ auto mal::core_ns() -> mal::MalNs {
                     {mal::MalSymbol{">="}, mal::MalNativeFn{1, true, greater_eq}},
                     {mal::MalSymbol{"<=>"}, mal::MalNativeFn{2, false, compare}},
                     {mal::MalSymbol{"eval"}, mal::MalNativeFn{1, false,eval}},
-                    {mal::MalSymbol{"*print-env*"}, mal::MalNativeFn{0, false,print_env}},
+                    {mal::MalSymbol{"*print-env*"}, mal::MalNativeFn{0, false, print_env}},
                     {mal::MalSymbol{"*env*"}, mal::MalNativeFn{0, false, get_env}},
                     {mal::MalSymbol{"atom"}, mal::MalNativeFn{1, false, make_atom}},
                     {mal::MalSymbol{"atom?"}, mal::MalNativeFn{1, false, is_atom}},
                     {mal::MalSymbol{"deref"}, mal::MalNativeFn{1, false, deref}},
                     {mal::MalSymbol{"reset!"}, mal::MalNativeFn{2, false, reset}},
                     {mal::MalSymbol{"swap!"}, mal::MalNativeFn{2, true, swap}},
+                    {mal::MalSymbol{"cons"}, mal::MalNativeFn{2, false, cons}},
+                    {mal::MalSymbol{"concat"}, mal::MalNativeFn{0, true, concat}},
             }
     );
     mal::EVAL(env, mal::READ("(def! load-file (fn* (*f*) (eval (read-string (str \"(do \" (slurp *f*) \"\\nnil)\")))))"));
@@ -77,6 +80,29 @@ auto mal::core_ns() -> mal::MalNs {
     };
 }
 
+static auto cons(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    if (!list.val[1].is_seq() && !list.val[1].is_string()) {
+        throw std::runtime_error("Argument 2 to cons must be a list, vector, or string!");
+    }
+    if (list.val[1].is_list()) {
+        auto res = mal::MalList{{list.val[0]}};
+        const auto& l = std::get<mal::MalList>(list.val[1].val).val;
+        res.val.insert(res.val.end(), l.begin(), l.end());
+        return res;
+    }
+    else if (list.val[1].is_vec()) {
+        auto res = mal::MalVector{{list.val[0]}};
+        const auto& l = std::get<mal::MalVector>(list.val[1].val).val;
+        res.val.insert(res.val.end(), l.begin(), l.end());
+        return res;
+    }
+    else {
+        auto res = mal::MalString{mal::PRINT(list.val[0], false)};
+        res.val += std::get<mal::MalString>(list.val[1].val).val;
+        return res;
+    }
+}
+
 static auto reset(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
     if (!list.val[0].is_atom()) {
         throw std::runtime_error("Argument 1 to reset! must be an atom!");
@@ -84,6 +110,23 @@ static auto reset(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) ->
     auto cpy = std::get<mal::MalAtom>(list.val[0].val);
     cpy.set(list.val[1]);
     return list.val[1];
+}
+
+static auto concat(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {
+    if (std::find_if_not(list.val.begin(), list.val.end(), [](const auto& v) { return v.is_seq(); }) != list.val.end()) {
+        throw std::runtime_error("All arguments to concat must be lists or vectors");
+    }
+    std::vector<mal::MalData> res;
+    for(const auto& seq : list.val) {
+        const auto& elems = (seq.is_list() ? std::get<mal::MalList>(seq.val).val : std::get<mal::MalVector>(seq.val).val);
+        res.insert(res.end(), elems.begin(), elems.end());
+    }
+    if (!list.val.empty() && list.val[0].is_vec()) {
+        return mal::MalData{mal::MalVector{std::move(res)}};
+    }
+    else {
+        return mal::MalData{mal::MalList{std::move(res)}};
+    }
 }
 
 static auto swap(std::shared_ptr<mal::MalEnv> env, const mal::MalList &list) -> mal::MalData {

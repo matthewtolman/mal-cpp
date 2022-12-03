@@ -4,6 +4,7 @@
 static auto eval_ast(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal::MalData;
 static auto pair_list(const std::vector<mal::MalData>& data) -> std::vector<std::pair<mal::MalSymbol, mal::MalData>>;
 static auto map_entries(std::map<mal::MalData, mal::MalData> data) -> std::vector<std::pair<mal::MalSymbol, mal::MalData>>;
+static auto quasiquote(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal::MalData;
 
 auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
     while (true) {
@@ -22,6 +23,19 @@ auto mal::EVAL(std::shared_ptr<MalEnv> env, mal::MalData data) -> mal::MalData {
                     auto& dEnv = env->root();
                     return dEnv[std::get<MalSymbol>(list.val[1].val)] = EVAL(env, list.val[2]);
                 }
+            }
+            else if (list.val[0] == MalSymbol{"quasiquoteexpand"}) {
+                if (!list.val[1].is_list() || std::get<mal::MalList>(list.val[1].val).val.size() != 2 || std::get<mal::MalList>(list.val[1].val).val[0] != mal::MalSymbol{"quasiquote"}) {
+                    throw std::runtime_error("Expected quasiquoteexpend in form (quasiquoteexpand (quasiquote <to-expand>))");
+                }
+                return quasiquote(env, std::get<mal::MalList>(list.val[1].val).val[1]);
+            }
+            else if (list.val[0] == MalSymbol{"quasiquote"}) {
+                auto quoted = mal::quasiquote(env, list.val[1]);
+                std::swap(data, quoted);
+            }
+            else if (list.val[0] == MalSymbol{"quote"}) {
+                return list.val[1];
             }
             else if (list.val[0] == MalSymbol{"let*"}) {
                 if (list.val.size() != 3) {
@@ -202,3 +216,30 @@ auto map_entries(std::map<mal::MalData, mal::MalData> data) -> std::vector<std::
     return res;
 }
 
+auto mal::quasiquote(std::shared_ptr<mal::MalEnv> env, mal::MalData ast) -> mal::MalData {
+    if (ast.is_list()) {
+        const auto& list = std::get<mal::MalList>(ast.val);
+        if (!list.val.empty() && list.val[0] == mal::MalSymbol{"unquote"}) {
+            return list.val[1];
+        }
+        else {
+            auto res = mal::MalList{};
+            for (auto eltIt = list.val.rbegin(); eltIt != list.val.rend(); ++eltIt) {
+                if (eltIt->is_list()) {
+                    const auto& eltList = std::get<mal::MalList>(eltIt->val);
+                    if (!eltList.val.empty() && eltList.val[0] == mal::MalSymbol("splice-unquote")) {
+                        auto cpy = mal::MalList{{mal::MalSymbol{"concat"}, eltList.val[1], res}};
+                        std::swap(cpy, res);
+                        continue;
+                    }
+                }
+                auto cpy = mal::MalList{{mal::MalSymbol{"cons"}, mal::MalList{{mal::MalSymbol{"quasiquote"}, *eltIt}}, res}};
+                std::swap(cpy, res);
+            }
+            return res;
+        }
+    }
+    else {
+        return mal::MalList{{mal::MalSymbol{"quote"}, ast}};
+    }
+}
